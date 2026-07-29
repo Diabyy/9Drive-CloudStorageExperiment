@@ -129,6 +129,11 @@ app.post('/api/v1/auth/google/exchange', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.get('/connected-accounts/google/callback', async (req, res) => {
   const code = req.query.code as string;
+  const error = req.query.error as string;
+
+  if (error === 'access_denied') {
+    return res.redirect(`${FRONTEND_URL}/?error=access_denied`);
+  }
   if (!code) return res.redirect(`${FRONTEND_URL}/?error=missing_code`);
 
   try {

@@ -102,8 +102,13 @@ export default function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    if (params.get('error')) {
-      showToast(`OAuth Error: ${params.get('error')}`, 'error');
+    const errorParam = params.get('error');
+    if (errorParam) {
+      if (errorParam === 'access_denied') {
+        showToast('Koneksi Google Drive dibatalkan.', 'error');
+      } else {
+        showToast(`OAuth Error: ${errorParam}`, 'error');
+      }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [showToast]);
