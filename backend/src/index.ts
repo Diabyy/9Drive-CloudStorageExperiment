@@ -51,21 +51,6 @@ app.get('/health', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM — Reset Cloud Database
-// ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/v1/system/reset-db', async (_req, res) => {
-  try {
-    await prisma.virtualFile.deleteMany({});
-    await prisma.virtualFolder.deleteMany({});
-    await prisma.connectedAccount.deleteMany({});
-    await prisma.user.deleteMany({});
-    res.json({ success: true, message: 'Cloud database reset successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // AUTH — Generate Google OAuth URL
 // ─────────────────────────────────────────────────────────────────────────────
 app.get('/api/v1/auth/google/url', (_req, res) => {
