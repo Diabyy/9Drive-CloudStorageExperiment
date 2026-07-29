@@ -49,6 +49,11 @@ export const authApi = {
     return res.data.url as string;
   },
 
+  async exchangeGoogleCode(code: string) {
+    const res = await apiClient.post('/auth/google/exchange', { code });
+    return res.data;
+  },
+
   async getMe() {
     const res = await apiClient.get('/auth/me');
     return res.data;

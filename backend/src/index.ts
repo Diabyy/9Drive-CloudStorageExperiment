@@ -9,6 +9,7 @@ import { Readable } from 'node:stream';
 import { PrismaClient } from '@prisma/client';
 import { generateAuthUrl, exchangeCodeForTokens, streamUploadToDrive, getAuthenticatedDriveClient, getOrCreateVaultFolder } from './services/googleDrive.js';
 import { encryptToken } from './services/crypto.js';
+import { backupDatabaseToDrive } from './services/dbBackup.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -58,6 +59,68 @@ app.get('/api/v1/auth/google/url', (_req, res) => {
     res.json({ url });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to generate Google OAuth URL' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH — Google OAuth Code Exchange (Frontend Callback)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/v1/auth/google/exchange', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Missing code' });
+
+  try {
+    const result = await exchangeCodeForTokens(code);
+    const refreshToken = result.tokens.refresh_token || result.tokens.access_token || '';
+    const encryptedAccess = encryptToken(result.tokens.access_token || '');
+    const encryptedRefresh = encryptToken(refreshToken);
+
+    let defaultUser = await prisma.user.findFirst();
+    if (!defaultUser) {
+      defaultUser = await prisma.user.create({
+        data: { email: 'demo@9drive.io', fullName: 'Demo User' },
+      });
+    }
+
+    let rootFolderId: string | null = null;
+    try {
+      rootFolderId = await getOrCreateVaultFolder(encryptedRefresh);
+    } catch (fErr) {
+      console.warn('Could not auto-create 9DRIVE_VAULT folder during OAuth exchange:', fErr);
+    }
+
+    const account = await prisma.connectedAccount.upsert({
+      where: { userId_accountEmail: { userId: defaultUser.id, accountEmail: result.email } },
+      update: {
+        accessTokenEnc: encryptedAccess,
+        refreshTokenEnc: encryptedRefresh,
+        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
+        totalQuotaBytes: result.totalQuotaBytes,
+        usedQuotaBytes: result.usedQuotaBytes,
+        rootDriveFolderId: rootFolderId,
+        isActive: true,
+        lastSyncedAt: new Date(),
+      },
+      create: {
+        userId: defaultUser.id,
+        accountEmail: result.email,
+        accountName: result.name,
+        provider: 'GOOGLE_DRIVE',
+        accessTokenEnc: encryptedAccess,
+        refreshTokenEnc: encryptedRefresh,
+        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
+        totalQuotaBytes: result.totalQuotaBytes,
+        usedQuotaBytes: result.usedQuotaBytes,
+        rootDriveFolderId: rootFolderId,
+        isActive: true,
+      },
+    });
+
+    backupDatabaseToDrive(encryptedRefresh);
+    res.json({ success: true, email: result.email, account });
+  } catch (error: any) {
+    console.error('OAuth Exchange Error:', error);
+    res.status(500).json({ error: error.message || 'OAuth code exchange failed' });
   }
 });
 

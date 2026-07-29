@@ -14,7 +14,7 @@ import { QuotaAnalyticsView } from './components/QuotaAnalyticsView';
 import { ConnectedAccountsView } from './components/ConnectedAccountsView';
 import { UserGuideView } from './components/UserGuideView';
 import { SettingsView } from './components/SettingsView';
-import { accountsApi, filesApi, uploadApi, foldersApi } from './services/api';
+import { accountsApi, filesApi, uploadApi, foldersApi, authApi } from './services/api';
 
 import type { Language } from './i18n/translations';
 
@@ -78,21 +78,35 @@ export default function App() {
   // Handle OAuth callback redirect URL params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
     const isConnected = params.get('connected');
     const connectedEmail = params.get('email');
-    if (isConnected === 'true' && connectedEmail) {
-      // Reload accounts from backend to get real quota data
+
+    if (code) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      authApi.exchangeGoogleCode(code)
+        .then((res) => {
+          accountsApi.getAccounts()
+            .then(accs => { if (accs?.length) setAccounts(accs); })
+            .catch(() => {});
+          showToast(`Berhasil Menghubungkan Google Drive: ${res.email}`, 'success');
+        })
+        .catch((err: any) => {
+          showToast(`OAuth Error: ${err.response?.data?.error || err.message}`, 'error');
+        });
+    } else if (isConnected === 'true' && connectedEmail) {
       accountsApi.getAccounts()
         .then(accs => { if (accs?.length) setAccounts(accs); })
         .catch(() => {});
       showToast(`Connected Google Drive: ${connectedEmail}`, 'success');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
     if (params.get('error')) {
       showToast(`OAuth Error: ${params.get('error')}`, 'error');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [showToast]);
 
 
 
