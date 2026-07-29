@@ -18,6 +18,8 @@ interface HeaderProps {
   onToggleMobileSidebar?: () => void;
 }
 
+import { BACKEND_BASE_URL } from '../services/api';
+
 export function Header({
   accounts, onConnectClick, onSearchChange, searchQuery = '', lang, onToggleLang, onToggleMobileSidebar,
 }: HeaderProps) {
@@ -26,7 +28,7 @@ export function Header({
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    fetch('http://localhost:4000/health')
+    fetch(`${BACKEND_BASE_URL}/health`)
       .then(r => r.ok && setGatewayOnline(true))
       .catch(() => setGatewayOnline(false));
   }, []);

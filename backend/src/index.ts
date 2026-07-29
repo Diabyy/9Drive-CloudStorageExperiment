@@ -16,7 +16,13 @@ const PORT = process.env.APP_PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    FRONTEND_URL,
+    'https://cloudstorage9drive.web.app',
+    'https://cloudstorage9drive.firebaseapp.com',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
   credentials: true,
 }));
 

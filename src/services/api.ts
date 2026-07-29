@@ -2,9 +2,12 @@
 import axios, { AxiosProgressEvent } from 'axios';
 import { DriveAccount, VaultFile, VirtualFolder } from '../types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL 
-  ? `${(import.meta as any).env.VITE_API_URL}/api/v1` 
-  : 'http://localhost:4000/api/v1';
+const DEFAULT_BACKEND_URL = (import.meta as any).env?.PROD
+  ? 'https://ninedrive-backend-k5he.onrender.com'
+  : 'http://localhost:4000';
+
+export const BACKEND_BASE_URL = (import.meta as any).env?.VITE_API_URL || DEFAULT_BACKEND_URL;
+export const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
