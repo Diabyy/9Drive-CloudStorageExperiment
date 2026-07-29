@@ -7,6 +7,8 @@ import cors from 'cors';
 import busboy from 'busboy';
 import { Readable } from 'node:stream';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { generateAuthUrl, exchangeCodeForTokens, streamUploadToDrive, getAuthenticatedDriveClient, getOrCreateVaultFolder } from './services/googleDrive.js';
 import { encryptToken } from './services/crypto.js';
 import { backupDatabaseToDrive } from './services/dbBackup.js';
@@ -15,6 +17,29 @@ const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.APP_PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const JWT_SECRET = process.env.JWT_SECRET || '9drive_super_secret_jwt_key_2026';
+
+export interface AuthRequest extends express.Request {
+  user?: {
+    id: string;
+    email: string;
+  };
+}
+
+const authenticateJwt = (req: AuthRequest, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
+      req.user = decoded;
+      return next();
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired authentication token' });
+    }
+  }
+  return res.status(401).json({ error: 'Authentication required' });
+};
 
 app.use(cors({
   origin: [
@@ -51,6 +76,82 @@ app.get('/health', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AUTHENTICATION ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/v1/auth/register', async (req, res) => {
+  const { email, password, fullName } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        passwordHash,
+        fullName: fullName?.trim() || email.split('@')[0],
+      },
+    });
+
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      success: true,
+      accessToken,
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Registration failed' });
+  }
+});
+
+app.post('/api/v1/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      success: true,
+      accessToken,
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Login failed' });
+  }
+});
+
+app.get('/api/v1/auth/me', authenticateJwt, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, email: true, fullName: true, avatarUrl: true, role: true },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch user' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // AUTH — Generate Google OAuth URL
 // ─────────────────────────────────────────────────────────────────────────────
 app.get('/api/v1/auth/google/url', (_req, res) => {
@@ -65,7 +166,7 @@ app.get('/api/v1/auth/google/url', (_req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH — Google OAuth Code Exchange (Frontend Callback)
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/v1/auth/google/exchange', async (req, res) => {
+app.post('/api/v1/auth/google/exchange', authenticateJwt, async (req: AuthRequest, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Missing code' });
 
@@ -75,12 +176,7 @@ app.post('/api/v1/auth/google/exchange', async (req, res) => {
     const encryptedAccess = encryptToken(result.tokens.access_token || '');
     const encryptedRefresh = encryptToken(refreshToken);
 
-    let defaultUser = await prisma.user.findFirst();
-    if (!defaultUser) {
-      defaultUser = await prisma.user.create({
-        data: { email: 'demo@9drive.io', fullName: 'Demo User' },
-      });
-    }
+    const userId = req.user!.id;
 
     let rootFolderId: string | null = null;
     try {
@@ -90,7 +186,7 @@ app.post('/api/v1/auth/google/exchange', async (req, res) => {
     }
 
     const account = await prisma.connectedAccount.upsert({
-      where: { userId_accountEmail: { userId: defaultUser.id, accountEmail: result.email } },
+      where: { userId_accountEmail: { userId, accountEmail: result.email } },
       update: {
         accessTokenEnc: encryptedAccess,
         refreshTokenEnc: encryptedRefresh,
@@ -102,7 +198,7 @@ app.post('/api/v1/auth/google/exchange', async (req, res) => {
         lastSyncedAt: new Date(),
       },
       create: {
-        userId: defaultUser.id,
+        userId,
         accountEmail: result.email,
         accountName: result.name,
         provider: 'GOOGLE_DRIVE',
@@ -125,78 +221,12 @@ app.post('/api/v1/auth/google/exchange', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH — Google OAuth Callback (receives code from Google, saves tokens to DB)
+// GET /api/v1/connected-accounts — List connected accounts for logged-in user
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/connected-accounts/google/callback', async (req, res) => {
-  const code = req.query.code as string;
-  const error = req.query.error as string;
-
-  if (error === 'access_denied') {
-    return res.redirect(`${FRONTEND_URL}/?error=access_denied`);
-  }
-  if (!code) return res.redirect(`${FRONTEND_URL}/?error=missing_code`);
-
-  try {
-    const result = await exchangeCodeForTokens(code);
-    const refreshToken = result.tokens.refresh_token || result.tokens.access_token || '';
-    const encryptedAccess = encryptToken(result.tokens.access_token || '');
-    const encryptedRefresh = encryptToken(refreshToken);
-
-    let defaultUser = await prisma.user.findFirst();
-    if (!defaultUser) {
-      defaultUser = await prisma.user.create({
-        data: { email: 'demo@9drive.io', fullName: 'Demo User' },
-      });
-    }
-
-    let rootFolderId: string | null = null;
-    try {
-      rootFolderId = await getOrCreateVaultFolder(encryptedRefresh);
-    } catch (fErr) {
-      console.warn('Could not auto-create 9DRIVE_VAULT folder during OAuth callback:', fErr);
-    }
-
-    await prisma.connectedAccount.upsert({
-      where: { userId_accountEmail: { userId: defaultUser.id, accountEmail: result.email } },
-      update: {
-        accessTokenEnc: encryptedAccess,
-        refreshTokenEnc: encryptedRefresh,
-        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
-        totalQuotaBytes: result.totalQuotaBytes,
-        usedQuotaBytes: result.usedQuotaBytes,
-        rootDriveFolderId: rootFolderId,
-        isActive: true,
-        lastSyncedAt: new Date(),
-      },
-      create: {
-        userId: defaultUser.id,
-        accountEmail: result.email,
-        accountName: result.name,
-        provider: 'GOOGLE_DRIVE',
-        accessTokenEnc: encryptedAccess,
-        refreshTokenEnc: encryptedRefresh,
-        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
-        totalQuotaBytes: result.totalQuotaBytes,
-        usedQuotaBytes: result.usedQuotaBytes,
-        rootDriveFolderId: rootFolderId,
-        isActive: true,
-      },
-    });
-
-    res.redirect(`${FRONTEND_URL}/?connected=true&email=${encodeURIComponent(result.email)}`);
-  } catch (error: any) {
-    console.error('OAuth Callback Error:', error);
-    res.redirect(`${FRONTEND_URL}/?error=${encodeURIComponent(error.message || 'oauth_failed')}`);
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/v1/connected-accounts — List all connected Google Drive accounts
-// ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/connected-accounts', async (_req, res) => {
+app.get('/api/v1/connected-accounts', authenticateJwt, async (req: AuthRequest, res) => {
   try {
     const accounts = await prisma.connectedAccount.findMany({
-      where: { isActive: true },
+      where: { userId: req.user!.id, isActive: true },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -230,11 +260,13 @@ app.get('/api/v1/connected-accounts', async (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/v1/storage/summary — Aggregate quota across all connected accounts
+// GET /api/v1/storage/summary — Aggregate quota for logged-in user
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/storage/summary', async (_req, res) => {
+app.get('/api/v1/storage/summary', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    const accounts = await prisma.connectedAccount.findMany({ where: { isActive: true } });
+    const accounts = await prisma.connectedAccount.findMany({
+      where: { userId: req.user!.id, isActive: true },
+    });
 
     const totalQuotaBytes = accounts.reduce((sum, a) => sum + Number(a.totalQuotaBytes), 0);
     const totalUsedBytes  = accounts.reduce((sum, a) => sum + Number(a.usedQuotaBytes), 0);
@@ -257,13 +289,16 @@ app.get('/api/v1/storage/summary', async (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VIRTUAL FOLDERS API
+// VIRTUAL FOLDERS API (Per User)
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/folders', async (req, res) => {
+app.get('/api/v1/folders', authenticateJwt, async (req: AuthRequest, res) => {
   try {
     const parentId = (req.query.parentId as string) || null;
     const folders = await prisma.virtualFolder.findMany({
-      where: { parentId: parentId === 'null' || parentId === '' ? null : parentId },
+      where: {
+        userId: req.user!.id,
+        parentId: parentId === 'null' || parentId === '' ? null : parentId,
+      },
       orderBy: { name: 'asc' },
     });
     res.json({ folders });
@@ -272,23 +307,16 @@ app.get('/api/v1/folders', async (req, res) => {
   }
 });
 
-app.post('/api/v1/folders', async (req, res) => {
+app.post('/api/v1/folders', authenticateJwt, async (req: AuthRequest, res) => {
   try {
     const { name, parentId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Folder name is required' });
-
-    let defaultUser = await prisma.user.findFirst();
-    if (!defaultUser) {
-      defaultUser = await prisma.user.create({
-        data: { email: 'demo@9drive.io', fullName: 'Demo User' },
-      });
-    }
 
     const folder = await prisma.virtualFolder.create({
       data: {
         name: name.trim(),
         parentId: parentId || null,
-        userId: defaultUser.id,
+        userId: req.user!.id,
       },
     });
 
@@ -298,9 +326,11 @@ app.post('/api/v1/folders', async (req, res) => {
   }
 });
 
-app.delete('/api/v1/folders/:id', async (req, res) => {
+app.delete('/api/v1/folders/:id', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    await prisma.virtualFolder.delete({ where: { id: req.params.id } });
+    await prisma.virtualFolder.deleteMany({
+      where: { id: req.params.id, userId: req.user!.id },
+    });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to delete folder' });
@@ -308,14 +338,15 @@ app.delete('/api/v1/folders/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/v1/files — List all virtual files stored in DB
+// GET /api/v1/files — List all virtual files for logged-in user
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/files', async (req, res) => {
+app.get('/api/v1/files', authenticateJwt, async (req: AuthRequest, res) => {
   try {
     const { q, category, folderId } = req.query as { q?: string; category?: string; folderId?: string };
 
     const files = await prisma.virtualFile.findMany({
       where: {
+        userId: req.user!.id,
         ...(q ? { fileName: { contains: q } } : {}),
         ...(category && category !== 'all' ? { mimeType: { contains: category } } : {}),
         ...(folderId ? (folderId === 'root' ? { folderId: null } : { folderId }) : {}),
@@ -366,9 +397,11 @@ app.get('/api/v1/files', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/v1/files/:id — Delete file record from DB
 // ─────────────────────────────────────────────────────────────────────────────
-app.delete('/api/v1/files/:id', async (req, res) => {
+app.delete('/api/v1/files/:id', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    await prisma.virtualFile.delete({ where: { id: req.params.id } });
+    await prisma.virtualFile.deleteMany({
+      where: { id: req.params.id, userId: req.user!.id },
+    });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to delete file' });
@@ -376,13 +409,13 @@ app.delete('/api/v1/files/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/v1/uploads — Stream-upload file directly to Google Drive (no disk write)
+// POST /api/v1/uploads — Stream-upload file directly to Google Drive
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/v1/uploads', async (req, res) => {
+app.post('/api/v1/uploads', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    // Pick the best account: most free space
+    // Pick the best account for current user
     const accounts = await prisma.connectedAccount.findMany({
-      where: { isActive: true },
+      where: { userId: req.user!.id, isActive: true },
       orderBy: [{ priorityOrder: 'asc' }],
     });
 
@@ -390,7 +423,6 @@ app.post('/api/v1/uploads', async (req, res) => {
       return res.status(400).json({ error: 'No connected Google Drive accounts found. Please connect at least one account.' });
     }
 
-    // MOST_AVAILABLE: choose the account with the most free bytes
     const target = accounts.reduce((best, cur) => {
       const bestFree = Number(best.totalQuotaBytes) - Number(best.usedQuotaBytes);
       const curFree  = Number(cur.totalQuotaBytes)  - Number(cur.usedQuotaBytes);
@@ -411,7 +443,6 @@ app.post('/api/v1/uploads', async (req, res) => {
       const { filename, mimeType } = info;
       fileUploaded = true;
 
-      // Collect all chunks into memory (safe for typical files < 5 GB)
       const chunks: Buffer[] = [];
       fileStream.on('data', (chunk: Buffer) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
       fileStream.on('end', async () => {
@@ -420,7 +451,6 @@ app.post('/api/v1/uploads', async (req, res) => {
         const sizeBytes = combined.length;
         const bufferStream = Readable.from(combined);
 
-        // Ensure 9DRIVE_VAULT system folder exists in Google Drive
         let rootFolderId = target.rootDriveFolderId;
         if (!rootFolderId) {
           try {
@@ -443,14 +473,6 @@ app.post('/api/v1/uploads', async (req, res) => {
           rootFolderId: rootFolderId || undefined,
         });
 
-        // Save file metadata to DB
-        let defaultUser = await prisma.user.findFirst();
-        if (!defaultUser) {
-          defaultUser = await prisma.user.create({
-            data: { email: 'demo@9drive.io', fullName: 'Demo User' },
-          });
-        }
-
         const savedFile = await prisma.virtualFile.create({
           data: {
             fileName: filename,
@@ -461,12 +483,11 @@ app.post('/api/v1/uploads', async (req, res) => {
             driveFileId: driveResult.driveFileId,
             driveWebViewLink: driveResult.driveWebViewLink,
             folderId: targetVirtualFolderId || null,
-            userId: defaultUser.id,
+            userId: req.user!.id,
           },
           include: { connectedAccount: true },
         });
 
-        // Update used quota on the account
         await prisma.connectedAccount.update({
           where: { id: target.id },
           data: { usedQuotaBytes: { increment: BigInt(sizeBytes) } },
@@ -516,10 +537,10 @@ app.post('/api/v1/uploads', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/files/:id/download — Proxy download URL from Google Drive
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/files/:id/download', async (req, res) => {
+app.get('/api/v1/files/:id/download', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    const file = await prisma.virtualFile.findUnique({
-      where: { id: req.params.id },
+    const file = await prisma.virtualFile.findFirst({
+      where: { id: req.params.id, userId: req.user!.id },
       include: { connectedAccount: true },
     });
     if (!file) return res.status(404).json({ error: 'File not found' });

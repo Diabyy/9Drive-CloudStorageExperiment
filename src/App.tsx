@@ -14,6 +14,7 @@ import { QuotaAnalyticsView } from './components/QuotaAnalyticsView';
 import { ConnectedAccountsView } from './components/ConnectedAccountsView';
 import { UserGuideView } from './components/UserGuideView';
 import { SettingsView } from './components/SettingsView';
+import { AuthModal } from './components/AuthModal';
 import { accountsApi, filesApi, uploadApi, foldersApi, authApi } from './services/api';
 
 import type { Language } from './i18n/translations';
@@ -22,6 +23,9 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => {
     return (localStorage.getItem('9drive_lang') as Language) || 'id';
   });
+
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; fullName?: string } | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const toggleLang = useCallback(() => {
     setLang(prev => {
@@ -67,13 +71,54 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  // Check user session on mount
   useEffect(() => {
+    const token = localStorage.getItem('9drive_access_token');
+    if (token) {
+      authApi.getMe()
+        .then(res => {
+          setCurrentUser(res.user);
+          setIsAuthModalOpen(false);
+        })
+        .catch(() => {
+          localStorage.removeItem('9drive_access_token');
+          setCurrentUser(null);
+          setIsAuthModalOpen(true);
+        });
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  }, []);
+
+  const handleAuthSuccess = useCallback((user: { id: string; email: string; fullName?: string }) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    showToast(lang === 'id' ? `Selamat datang, ${user.fullName || user.email}!` : `Welcome, ${user.fullName || user.email}!`, 'success');
     accountsApi.getAccounts()
-      .then(accs => { if (accs?.length) setAccounts(accs); })
-      .catch(() => {});
+      .then(accs => setAccounts(accs || []))
+      .catch(() => setAccounts([]));
+    refreshVaultContent(currentFolderId);
+  }, [currentFolderId, lang, refreshVaultContent, showToast]);
+
+  const handleLogout = useCallback(() => {
+    authApi.logout();
+    setCurrentUser(null);
+    setAccounts([]);
+    setFiles([]);
+    setFolders([]);
+    setIsAuthModalOpen(true);
+    showToast(lang === 'id' ? 'Berhasil keluar dari Vault.' : 'Successfully logged out.', 'success');
+  }, [lang, showToast]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    accountsApi.getAccounts()
+      .then(accs => { setAccounts(accs || []); })
+      .catch(() => setAccounts([]));
 
     refreshVaultContent(currentFolderId);
-  }, [currentFolderId, refreshVaultContent]);
+  }, [currentUser, currentFolderId, refreshVaultContent]);
 
   // Handle OAuth callback redirect URL params
   useEffect(() => {
@@ -280,6 +325,8 @@ export default function App() {
         lang={lang}
         onToggleLang={toggleLang}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Body */}
@@ -371,6 +418,12 @@ export default function App() {
       <ConnectAccountModal isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} onAddAccount={a => setAccounts(prev => [...prev, a])} />
       <FilePreviewModal file={previewFile} accounts={accounts} onClose={() => setPreviewFile(null)} onOpenTransferModal={f => setTransferFile(f)} onDeleteFile={handleDeleteFile} onShareFile={handleShareFile} />
       <TransferModal file={transferFile} accounts={accounts} onClose={() => setTransferFile(null)} onTransferFile={handleTransferFile} />
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen || !currentUser}
+        onSuccess={handleAuthSuccess}
+        lang={lang}
+      />
     </div>
   );
 }

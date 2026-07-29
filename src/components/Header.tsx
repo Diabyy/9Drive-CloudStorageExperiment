@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Wifi, WifiOff, Zap, Search, Bell, Menu } from 'lucide-react';
+import { Plus, Wifi, WifiOff, Zap, Search, Bell, Menu, LogOut, User as UserIcon } from 'lucide-react';
 import type { DriveAccount, RoutingStrategy } from '../types';
 
 import type { Language } from '../i18n/translations';
@@ -16,12 +16,14 @@ interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
   onToggleMobileSidebar?: () => void;
+  currentUser?: { id: string; email: string; fullName?: string } | null;
+  onLogout?: () => void;
 }
 
 import { BACKEND_BASE_URL } from '../services/api';
 
 export function Header({
-  accounts, onConnectClick, onSearchChange, searchQuery = '', lang, onToggleLang, onToggleMobileSidebar,
+  accounts, onConnectClick, onSearchChange, searchQuery = '', lang, onToggleLang, onToggleMobileSidebar, currentUser, onLogout,
 }: HeaderProps) {
   const t = translations[lang];
   const [gatewayOnline, setGatewayOnline] = useState(false);
@@ -108,6 +110,25 @@ export function Header({
         <span className="text-slate-600">|</span>
         <span className={lang === 'en' ? 'text-cyan-400 font-extrabold' : 'text-slate-500'}>EN</span>
       </button>
+
+      {/* User Profile & Logout */}
+      {currentUser && (
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs text-slate-200">
+            <UserIcon className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-medium max-w-[100px] truncate">{currentUser.fullName || currentUser.email.split('@')[0]}</span>
+          </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title={lang === 'id' ? 'Keluar / Logout' : 'Sign Out'}
+              className="p-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Connect Button */}
       <motion.button
