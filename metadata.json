@@ -1,0 +1,6 @@
+{
+  "name": "9DRIVE: Personal Multi-Drive Storage Vault",
+  "description": "Ultra-sleek dark mode personal multi-drive storage vault aggregator with real-time quota management and smart upload routing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

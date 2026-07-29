@@ -1,0 +1,170 @@
+// Prisma Data Model for Multi-Account Google Drive Storage Gateway
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ProviderType {
+  GOOGLE_DRIVE
+  S3_COMPATIBLE
+}
+
+enum StorageRoutingPolicy {
+  MOST_AVAILABLE
+  ROUND_ROBIN
+  PRIORITY_ORDER
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String?            // Null if registered purely via Google OAuth
+  fullName          String?
+  avatarUrl         String?
+  role              Role               @default(USER)
+  routingPolicy     StorageRoutingPolicy @default(MOST_AVAILABLE)
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  // Relationships
+  connectedAccounts ConnectedAccount[]
+  virtualFolders    VirtualFolder[]
+  virtualFiles      VirtualFile[]
+  apiKeys           ApiKey[]
+  refreshTokens     RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  tokenHash   String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model ConnectedAccount {
+  id                 String       @id @default(uuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  provider           ProviderType @default(GOOGLE_DRIVE)
+  accountEmail       String
+  accountName        String?
+  
+  // Encrypted OAuth Tokens (AES-256-GCM)
+  accessTokenEnc     String       @db.Text
+  refreshTokenEnc    String       @db.Text
+  tokenExpiresAt     DateTime
+  
+  // Root Storage Folder ID inside Google Drive (e.g. "9drive" root folder ID)
+  rootDriveFolderId  String?
+  
+  // Quota Metrics (In Bytes)
+  totalQuotaBytes    BigInt       @default(0)
+  usedQuotaBytes     BigInt       @default(0)
+  lastSyncedAt       DateTime     @default(now())
+  
+  isActive           Boolean      @default(true)
+  priorityOrder      Int          @default(0)
+  
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  files              VirtualFile[]
+
+  @@unique([userId, accountEmail])
+  @@map("connected_accounts")
+}
+
+model VirtualFolder {
+  id          String          @id @default(uuid())
+  name        String
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  parentId    String?
+  parent      VirtualFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    VirtualFolder[] @relation("FolderHierarchy")
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  files       VirtualFile[]
+
+  @@unique([userId, parentId, name])
+  @@map("virtual_folders")
+}
+
+model VirtualFile {
+  id                 String           @id @default(uuid())
+  fileName           String
+  originalName       String
+  mimeType           String
+  sizeBytes          BigInt
+  
+  // Storage Location Mapping
+  connectedAccountId String
+  connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+  
+  // Physical ID in Google Drive or S3 Object Key
+  driveFileId        String
+  driveWebViewLink   String?
+  
+  // Virtual Folder Parent
+  folderId           String?
+  folder             VirtualFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isPublic           Boolean          @default(false)
+  shareToken         String?          @unique
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([userId, folderId])
+  @@index([connectedAccountId])
+  @@map("virtual_files")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String    // First 8 chars for identification (e.g., 9d_live_...)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revoked     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@map("api_keys")
+}
+
+model SystemSetting {
+  key         String   @id
+  valueEnc    String   @db.Text // Encrypted global configs (e.g. global OAuth Client ID/Secret)
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}

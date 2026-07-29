@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String?
+  fullName          String?
+  avatarUrl         String?
+  role              String             @default("USER")
+  routingPolicy     String             @default("MOST_AVAILABLE")
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  connectedAccounts ConnectedAccount[]
+  virtualFolders    VirtualFolder[]
+  virtualFiles      VirtualFile[]
+  apiKeys           ApiKey[]
+  refreshTokens     RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model ConnectedAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider          String        @default("GOOGLE_DRIVE")
+  accountEmail      String
+  accountName       String?
+
+  accessTokenEnc    String
+  refreshTokenEnc   String
+  tokenExpiresAt    DateTime
+
+  rootDriveFolderId String?
+
+  totalQuotaBytes   BigInt        @default(0)
+  usedQuotaBytes    BigInt        @default(0)
+  lastSyncedAt      DateTime      @default(now())
+
+  isActive          Boolean       @default(true)
+  priorityOrder     Int           @default(0)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  files             VirtualFile[]
+
+  @@unique([userId, accountEmail])
+  @@map("connected_accounts")
+}
+
+model VirtualFolder {
+  id        String          @id @default(uuid())
+  name      String
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  parentId  String?
+  parent    VirtualFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  VirtualFolder[] @relation("FolderHierarchy")
+
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  files     VirtualFile[]
+
+  @@unique([userId, parentId, name])
+  @@map("virtual_folders")
+}
+
+model VirtualFile {
+  id                 String           @id @default(uuid())
+  fileName           String
+  originalName       String
+  mimeType           String
+  sizeBytes          BigInt
+
+  connectedAccountId String
+  connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+
+  driveFileId        String
+  driveWebViewLink   String?
+
+  folderId           String?
+  folder             VirtualFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isPublic           Boolean          @default(false)
+  shareToken         String?          @unique
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([userId, folderId])
+  @@index([connectedAccountId])
+  @@map("virtual_files")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revoked    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  @@map("api_keys")
+}
+
+model SystemSetting {
+  key       String   @id
+  valueEnc  String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
