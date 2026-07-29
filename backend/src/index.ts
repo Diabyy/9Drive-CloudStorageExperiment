@@ -23,8 +23,22 @@ app.use(cors({
 app.use(express.json());
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HEALTH CHECK
+// ROOT & HEALTH CHECK
 // ─────────────────────────────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'online',
+    service: '9Drive Backend Gateway',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api/v1/files',
+      connectedAccounts: '/api/v1/connected-accounts',
+    },
+  });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: '9Drive Gateway Backend', timestamp: new Date().toISOString() });
 });
