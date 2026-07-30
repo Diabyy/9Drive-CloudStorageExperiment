@@ -22,6 +22,8 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
+import { NineDriveLogo } from './NineDriveLogo';
+
 export function Sidebar({
   activeView, onViewChange, routingStrategy, onRoutingChange,
   totalAccounts, totalFiles, onConnectClick, lang,
@@ -74,18 +76,7 @@ export function Sidebar({
       >
         {/* Logo */}
         <div className="px-5 pt-6 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--accent-blue)' }}
-            >
-              <HardDrive className="w-4 h-4 text-white" strokeWidth={1.5} />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-[--text-primary] tracking-tight">9DRIVE</p>
-              <p className="text-[10px] text-[--text-muted] tracking-wide mt-0.5">{t.vaultSystem}</p>
-            </div>
-          </div>
+          <NineDriveLogo size={28} />
         </div>
 
         <div className="h-px mx-4" style={{ background: 'rgba(255, 255, 255, 0.06)' }} />
