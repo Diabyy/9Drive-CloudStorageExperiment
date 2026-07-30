@@ -30,7 +30,7 @@ const card = {
   show:   { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 340, damping: 28 } },
 };
 
-export function QuotaAnalyticsView({ accounts, files }: Props) {
+export function QuotaAnalyticsView({ accounts, files, onCleanDuplicates }: Props) {
   const totalCapacity = accounts.reduce((s, a) => s + a.totalStorageGB, 0);
   const totalUsed     = accounts.reduce((s, a) => s + a.usedStorageGB, 0);
   const totalFree     = Math.max(0, totalCapacity - totalUsed);
@@ -205,6 +205,80 @@ export function QuotaAnalyticsView({ accounts, files }: Props) {
           <span>{totalCapacity.toFixed(1)} GB total</span>
         </div>
       </motion.div>
+
+      {/* Smart Duplicate Scanner Card */}
+      {(() => {
+        // Find duplicate files by name + sizeBytes
+        const nameMap: Record<string, VaultFile[]> = {};
+        files.forEach(f => {
+          const key = `${f.name.toLowerCase()}_${f.sizeBytes}`;
+          nameMap[key] = nameMap[key] || [];
+          nameMap[key].push(f);
+        });
+
+        const duplicateGroups = Object.values(nameMap).filter(g => g.length > 1);
+        const totalWastedBytes = duplicateGroups.reduce((sum, group) => {
+          return sum + group.slice(1).reduce((s, f) => s + f.sizeBytes, 0);
+        }, 0);
+
+        return (
+          <motion.div
+            variants={card} initial="hidden" animate="show"
+            className="rounded-2xl p-5 relative overflow-hidden"
+            style={{
+              background: 'rgba(255, 159, 10, 0.04)',
+              border: '1px solid rgba(255, 159, 10, 0.15)',
+            }}
+          >
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[--accent-orange]/10 border border-[--accent-orange]/20 text-[--accent-orange] flex items-center justify-center">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Pemasok Pembersih Berkas Duplikat</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[--accent-orange]/15 text-[--accent-orange] font-semibold">Smart Scan</span>
+                  </h4>
+                  <p className="text-xs text-[--text-secondary] mt-0.5">
+                    {duplicateGroups.length > 0
+                      ? `Ditemukan ${duplicateGroups.length} kelompok berkas ganda (${fmt(totalWastedBytes)} memori terbuang)`
+                      : 'Vault Anda bersih! Tidak ditemukan berkas duplikat di antar-drive.'}
+                  </p>
+                </div>
+              </div>
+
+              {duplicateGroups.length > 0 && onCleanDuplicates && (
+                <button
+                  onClick={onCleanDuplicates}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[--accent-orange] hover:opacity-90 transition-all cursor-pointer shadow-lg"
+                >
+                  Bersihkan Duplikat ({fmt(totalWastedBytes)})
+                </button>
+              )}
+            </div>
+
+            {duplicateGroups.length > 0 && (
+              <div className="space-y-2 mt-4">
+                {duplicateGroups.slice(0, 3).map((group, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl flex items-center justify-between text-xs"
+                    style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="w-2 h-2 rounded-full bg-[--accent-orange] shrink-0" />
+                      <span className="font-semibold text-white truncate">{group[0].name}</span>
+                      <span className="text-[--text-muted]">({group.length}x tersimpan)</span>
+                    </div>
+                    <span className="text-[--accent-orange] font-mono shrink-0 ml-2">{fmt(group[0].sizeBytes)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        );
+      })()}
     </div>
   );
 }

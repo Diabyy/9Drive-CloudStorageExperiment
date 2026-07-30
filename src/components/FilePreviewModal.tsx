@@ -94,7 +94,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
-            {file.thumbnailUrl ? (
+            {file.category === 'videos' ? (
+              <video
+                controls
+                src={file.sharedUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
+                className="max-h-64 w-full rounded-xl object-contain shadow-2xl"
+              />
+            ) : file.mimeType.startsWith('audio/') ? (
+              <div className="w-full p-6 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-[--accent-purple]/20 border border-[--accent-purple]/40 text-[--accent-purple] mx-auto flex items-center justify-center animate-bounce">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <audio controls className="w-full">
+                  <source src={file.sharedUrl} />
+                </audio>
+              </div>
+            ) : file.thumbnailUrl ? (
               <img
                 src={file.thumbnailUrl}
                 alt={file.name}
@@ -138,7 +153,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
             <div>
               <span className="text-[10px] text-[--text-muted] uppercase font-bold tracking-wider block mb-1">
-                Link Berkas Terpadu
+                Link Berkas Terpadu & Proteksi PIN
               </span>
               <div className="flex items-center gap-2">
                 <input

@@ -16,6 +16,7 @@ interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
   onToggleMobileSidebar?: () => void;
+  onOpenCommandPalette?: () => void;
   currentUser?: { id: string; email: string; fullName?: string } | null;
   onLogout?: () => void;
 }
@@ -23,7 +24,7 @@ interface HeaderProps {
 import { BACKEND_BASE_URL } from '../services/api';
 
 export function Header({
-  accounts, onConnectClick, onSearchChange, searchQuery = '', lang, onToggleLang, onToggleMobileSidebar, currentUser, onLogout,
+  accounts, onConnectClick, onSearchChange, searchQuery = '', lang, onToggleLang, onToggleMobileSidebar, onOpenCommandPalette, currentUser, onLogout,
 }: HeaderProps) {
   const t = translations[lang];
   const [gatewayOnline, setGatewayOnline] = useState(false);
@@ -82,7 +83,7 @@ export function Header({
         </div>
       )}
 
-      {/* Search */}
+      {/* Search Bar with Ctrl+K Badge */}
       <div className="flex-1 max-w-xs ml-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[--text-muted]" />
@@ -90,21 +91,19 @@ export function Header({
             type="text"
             value={searchQuery}
             onChange={e => onSearchChange?.(e.target.value)}
+            onClick={onOpenCommandPalette}
             placeholder={t.searchPlaceholder}
-            className="w-full pl-9 pr-4 py-2 rounded-[10px] text-xs text-[--text-primary] placeholder-[--text-muted] outline-none transition-all duration-200"
+            className="w-full rounded-xl pl-9 pr-12 py-1.5 text-xs text-[--text-primary] placeholder-[--text-muted] outline-none transition-all cursor-pointer"
             style={{
               background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
-            onFocus={e => {
-              e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.4)';
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)';
-            }}
-            onBlur={e => {
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-            }}
+            onFocus={e => e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.5)'}
+            onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
           />
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-mono text-[--text-muted] bg-white/5 border border-white/10 pointer-events-none hidden sm:inline-block">
+            ⌘K
+          </kbd>
         </div>
       </div>
 

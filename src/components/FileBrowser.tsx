@@ -65,6 +65,27 @@ export function FileBrowser({
   const [newFolderName, setNewFolderName] = useState('');
 
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [checkedFileIds, setCheckedFileIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (checkedFileIds.length === filtered.length) {
+      setCheckedFileIds([]);
+    } else {
+      setCheckedFileIds(filtered.map(f => f.id));
+    }
+  };
+
+  const toggleCheckFile = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setCheckedFileIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    checkedFileIds.forEach(id => onDeleteFile(id));
+    setCheckedFileIds([]);
+  };
 
   // Keyboard shortcut handler for selected file (Space preview, Delete/Backspace delete)
   useEffect(() => {
@@ -274,7 +295,15 @@ export function FileBrowser({
                 className="text-[11px] text-[--text-muted] uppercase tracking-wider"
                 style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}
               >
-                <th className="text-left px-5 py-3 w-10 font-medium">★</th>
+                <th className="text-center px-3 py-3 w-10 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && checkedFileIds.length === filtered.length}
+                    onChange={toggleSelectAll}
+                    className="rounded accent-[--accent-blue] cursor-pointer"
+                  />
+                </th>
+                <th className="text-left px-3 py-3 w-10 font-medium">★</th>
                 <th className="text-left px-3 py-3 font-medium">File Name</th>
                 <th className="text-left px-3 py-3 font-medium hidden md:table-cell">Size</th>
                 <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Drive</th>
@@ -289,6 +318,7 @@ export function FileBrowser({
                   const accent = ACCENT_COLORS[file.category] || ACCENT_COLORS.documents;
                   const isEditing = editingId === file.id;
                   const driveColor = DRIVE_COLORS[driveIdx % DRIVE_COLORS.length];
+                  const isChecked = checkedFileIds.includes(file.id);
 
                   return (
                     <motion.tr
@@ -301,17 +331,27 @@ export function FileBrowser({
                       className="group transition-colors duration-100 cursor-pointer"
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
-                        background: selectedFileId === file.id ? 'rgba(41, 151, 255, 0.10)' : 'transparent',
+                        background: isChecked ? 'rgba(41, 151, 255, 0.15)' : selectedFileId === file.id ? 'rgba(41, 151, 255, 0.10)' : 'transparent',
                       }}
                       onMouseEnter={e => {
-                        if (selectedFileId !== file.id) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                        if (selectedFileId !== file.id && !isChecked) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                       }}
                       onMouseLeave={e => {
-                        if (selectedFileId !== file.id) e.currentTarget.style.background = 'transparent';
+                        if (selectedFileId !== file.id && !isChecked) e.currentTarget.style.background = 'transparent';
                       }}
                     >
+                      {/* Multi-Select Checkbox */}
+                      <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => toggleCheckFile(file.id)}
+                          className="rounded accent-[--accent-blue] cursor-pointer"
+                        />
+                      </td>
+
                       {/* Star */}
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-3">
                         <button
                           onClick={e => { e.stopPropagation(); onToggleStar(file.id); }}
                           className="w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer"
@@ -519,6 +559,62 @@ export function FileBrowser({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Bulk Action Bar */}
+      <AnimatePresence>
+        {checkedFileIds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 25, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 25, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 px-5 py-3 rounded-2xl shadow-2xl border"
+            style={{
+              background: 'rgba(18, 18, 22, 0.95)',
+              border: '1px solid rgba(41, 151, 255, 0.3)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 30px rgba(41, 151, 255, 0.15)',
+            }}
+          >
+            <span className="text-xs font-semibold text-white flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-[--accent-blue] text-white text-[11px] font-bold flex items-center justify-center">
+                {checkedFileIds.length}
+              </span>
+              Berkas Terpilih
+            </span>
+
+            <div className="h-4 w-px bg-white/10" />
+
+            <button
+              onClick={() => {
+                checkedFileIds.forEach(id => {
+                  const f = files.find(x => x.id === id);
+                  if (f) onPreviewFile(f);
+                });
+              }}
+              className="text-xs font-medium text-[--text-primary] hover:text-[--accent-blue] transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Buka Batch</span>
+            </button>
+
+            <button
+              onClick={handleBulkDelete}
+              className="text-xs font-medium text-[--accent-red] hover:opacity-80 transition-opacity flex items-center gap-1.5 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Batch ({checkedFileIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => setCheckedFileIds([])}
+              className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-[--text-secondary] flex items-center justify-center text-xs transition-colors cursor-pointer ml-2"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

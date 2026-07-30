@@ -15,6 +15,7 @@ import { ConnectedAccountsView } from './components/ConnectedAccountsView';
 import { UserGuideView } from './components/UserGuideView';
 import { SettingsView } from './components/SettingsView';
 import { AuthModal } from './components/AuthModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { accountsApi, filesApi } from './services/api';
 import { LandingPage } from './components/LandingPage';
 import { useVaultData } from './hooks/useVaultData';
@@ -53,6 +54,7 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
 
   // Modals
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<VaultFile | null>(null);
   const [transferFile, setTransferFile] = useState<VaultFile | null>(null);
 
@@ -182,6 +184,7 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
         lang={lang}
         onToggleLang={toggleLang}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         currentUser={currentUser}
         onLogout={handleLogout}
       />
@@ -308,7 +311,26 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
               </motion.div>
             ) : activeView === 'analytics' ? (
               <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 overflow-hidden">
-                <QuotaAnalyticsView accounts={accounts} files={files} onCleanDuplicates={() => {}} />
+                <QuotaAnalyticsView
+                  accounts={accounts}
+                  files={files}
+                  onCleanDuplicates={() => {
+                    const nameMap: Record<string, VaultFile[]> = {};
+                    files.forEach(f => {
+                      const key = `${f.name.toLowerCase()}_${f.sizeBytes}`;
+                      nameMap[key] = nameMap[key] || [];
+                      nameMap[key].push(f);
+                    });
+                    const duplicatesToDelete: string[] = [];
+                    Object.values(nameMap).forEach(g => {
+                      if (g.length > 1) {
+                        g.slice(1).forEach(dup => duplicatesToDelete.push(dup.id));
+                      }
+                    });
+                    duplicatesToDelete.forEach(id => handleDeleteFile(id));
+                    showToast(lang === 'id' ? `Berhasil membersihkan ${duplicatesToDelete.length} berkas duplikat!` : `Cleaned ${duplicatesToDelete.length} duplicate files!`, 'success');
+                  }}
+                />
               </motion.div>
             ) : activeView === 'accounts' ? (
               <motion.div key="accounts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 overflow-hidden">
@@ -338,6 +360,15 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
       <ConnectAccountModal isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} onAddAccount={a => setAccounts(prev => [...prev, a])} />
       <FilePreviewModal file={previewFile} accounts={accounts} onClose={() => setPreviewFile(null)} onOpenTransferModal={f => setTransferFile(f)} onDeleteFile={handleDeleteFile} onShareFile={handleShareFile} />
       <TransferModal file={transferFile} accounts={accounts} onClose={() => setTransferFile(null)} onTransferFile={handleTransferFile} />
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        files={files}
+        onSelectFile={f => setPreviewFile(f)}
+        onNavigateView={v => setActiveView(v)}
+        onConnectDrive={() => setIsConnectModalOpen(true)}
+        lang={lang}
+      />
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen || !currentUser}
