@@ -14,6 +14,11 @@ import { encryptToken } from './services/crypto.js';
 import { backupDatabaseToDrive } from './services/dbBackup.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 
+// Polyfill BigInt.prototype.toJSON to prevent Express res.json() crash on Prisma BigInt fields
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.APP_PORT || 4000;
@@ -246,7 +251,11 @@ app.post('/api/v1/auth/google/exchange', asyncHandler(async (req: AuthRequest, r
     accessToken,
     user: { id: user?.id, email: user?.email, fullName: user?.fullName },
     email: result.email,
-    account,
+    account: {
+      ...account,
+      totalQuotaBytes: Number(account.totalQuotaBytes),
+      usedQuotaBytes: Number(account.usedQuotaBytes),
+    },
   });
 }));
 
