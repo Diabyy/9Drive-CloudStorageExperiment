@@ -379,6 +379,14 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
   );
 }
 
+function LandingPageWrapper({ lang, onToggleLang }: { lang: Language; onToggleLang: () => void }) {
+  const search = window.location.search;
+  if (search.includes('code=') || search.includes('error=')) {
+    return <Navigate to={`/app${search}`} replace />;
+  }
+  return <LandingPage lang={lang} onToggleLang={onToggleLang} />;
+}
+
 export default function App() {
   const [lang, setLang] = useState<Language>(() => {
     return (localStorage.getItem('9drive_lang') as Language) || 'id';
@@ -395,7 +403,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LandingPage lang={lang} onToggleLang={toggleLang} />} />
+        <Route path="/" element={<LandingPageWrapper lang={lang} onToggleLang={toggleLang} />} />
         <Route path="/app" element={<Dashboard lang={lang} toggleLang={toggleLang} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

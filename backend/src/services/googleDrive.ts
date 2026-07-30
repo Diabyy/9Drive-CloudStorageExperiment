@@ -5,7 +5,7 @@ import { decryptToken } from './crypto.js';
 export function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID || '';
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-  const defaultRedirect = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const defaultRedirect = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/app` : 'http://localhost:3000/app';
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || defaultRedirect;
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
