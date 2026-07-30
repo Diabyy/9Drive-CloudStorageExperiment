@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Mail, User, ShieldCheck, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
+import { Lock, Mail, User, ShieldCheck, ArrowRight, Sparkles, KeyRound, ArrowLeft, FileText } from 'lucide-react';
 import { authApi } from '../services/api';
+import { TermsModal } from './TermsModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,8 +18,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleBackToLanding = () => {
+    window.location.href = '/';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +104,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
               filter: 'blur(40px)',
             }}
           />
+
+          {/* Back to Landing Page Button */}
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <button
+              onClick={handleBackToLanding}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[--text-secondary] hover:text-white bg-white/5 hover:bg-white/10 transition-all cursor-pointer border border-white/10"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{lang === 'id' ? 'Kembali ke Beranda' : 'Back to Home'}</span>
+            </button>
+          </div>
 
           {/* Header Title */}
           <div className="text-center mb-6 relative z-10">
@@ -284,8 +301,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
             </button>
           </form>
 
-          {/* Toggle Mode */}
-          <div className="mt-6 pt-4 border-t border-white/10 text-center relative z-10">
+          {/* Toggle Mode & Terms Link */}
+          <div className="mt-6 pt-4 border-t border-white/10 text-center relative z-10 space-y-3">
             <p className="text-xs text-[--text-secondary]">
               {isLoginMode
                 ? (lang === 'id' ? 'Belum punya akun Vault?' : "Don't have a Vault account?")
@@ -304,8 +321,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
                   : (lang === 'id' ? 'Masuk Di Sini' : 'Sign In Here')}
               </button>
             </p>
+
+            <button
+              type="button"
+              onClick={() => setIsTermsOpen(true)}
+              className="text-[11px] text-[--text-muted] hover:text-[--text-secondary] underline transition-colors cursor-pointer block mx-auto"
+            >
+              {lang === 'id' ? 'Syarat & Ketentuan Layanan (Terms & Privacy)' : 'Terms of Service & Privacy Policy'}
+            </button>
           </div>
 
+          <TermsModal
+            isOpen={isTermsOpen}
+            onClose={() => setIsTermsOpen(false)}
+            lang={lang}
+          />
         </motion.div>
       </div>
     </AnimatePresence>
