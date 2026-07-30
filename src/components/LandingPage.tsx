@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { Language } from "../i18n/translations";
 import { translations } from "../i18n/translations";
+import { TermsModal } from "./TermsModal";
 
 interface LandingPageProps {
   lang: Language;
@@ -74,6 +75,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 export function LandingPage({ lang, onToggleLang }: LandingPageProps) {
   const t = translations[lang];
   const navigate = useNavigate();
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   // Storage Calculator State (Nike/Apple style interactive hook)
   const [driveCount, setDriveCount] = useState<number>(5);
@@ -1003,8 +1005,24 @@ export function LandingPage({ lang, onToggleLang }: LandingPageProps) {
               9DRIVE VAULT
             </span>
           </div>
-          <div>{t.landingFooter}</div>
+
+          <div className="flex items-center gap-4 text-xs">
+            <button
+              onClick={() => setIsTermsOpen(true)}
+              className="text-[--text-secondary] hover:text-white underline transition-colors cursor-pointer"
+            >
+              {lang === 'id' ? 'Syarat & Ketentuan Layanan' : 'Terms & Privacy Policy'}
+            </button>
+            <span>&bull;</span>
+            <span>{t.landingFooter}</span>
+          </div>
         </div>
+
+        <TermsModal
+          isOpen={isTermsOpen}
+          onClose={() => setIsTermsOpen(false)}
+          lang={lang}
+        />
       </footer>
     </div>
   );
