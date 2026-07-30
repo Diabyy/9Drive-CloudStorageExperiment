@@ -239,7 +239,7 @@ app.post('/api/v1/auth/google/exchange', asyncHandler(async (req: AuthRequest, r
 
   backupDatabaseToDrive(encryptedRefresh);
 
-  const accessToken = jwt.sign({ id: userId, email: result.email }, JWT_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ id: userId, email: user?.email || result.email }, JWT_SECRET, { expiresIn: '7d' });
 
   res.json({
     success: true,
