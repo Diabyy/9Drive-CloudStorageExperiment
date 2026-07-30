@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Lock, Mail, User, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Lock, Mail, User, ShieldCheck, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
 import { authApi } from '../services/api';
 
 interface AuthModalProps {
   isOpen: boolean;
   onSuccess: (user: { id: string; email: string; fullName?: string }) => void;
   lang?: 'id' | 'en';
+  onClose?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 'id' }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 'id', onClose }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,134 +46,268 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
     }
   };
 
+  // One-click Demo Login for fast testing
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const demoEmail = 'demo@9drive.app';
+      const demoPassword = 'password123';
+      try {
+        const res = await authApi.login(demoEmail, demoPassword);
+        onSuccess(res.user);
+      } catch {
+        const res = await authApi.register(demoEmail, demoPassword, 'Demo User');
+        onSuccess(res.user);
+      }
+    } catch (err: any) {
+      setErrorMsg(lang === 'id' ? 'Gagal login mode demo' : 'Demo login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-fade-in font-sans">
-      <div className="relative w-full max-w-md bg-[#0d1322] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(6,182,212,0.15)] overflow-hidden">
-        
-        {/* Glow Decor Background */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+    <AnimatePresence>
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+          className="relative w-full max-w-md p-6 sm:p-8 rounded-3xl overflow-hidden text-left"
+          style={{
+            background: 'rgba(18, 18, 22, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.8), 0 0 40px rgba(41, 151, 255, 0.12)',
+          }}
+        >
+          {/* Ambient Top Glow */}
+          <div 
+            className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse, rgba(41, 151, 255, 0.2) 0%, transparent 70%)',
+              filter: 'blur(40px)',
+            }}
+          />
 
-        {/* Header Title */}
-        <div className="text-center mb-6 relative z-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-3 shadow-inner">
-            <ShieldCheck className="w-7 h-7" />
+          {/* Header Title */}
+          <div className="text-center mb-6 relative z-10">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#2997FF]/10 border border-[#2997FF]/30 text-[--accent-blue] mb-3">
+              <ShieldCheck className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            
+            <h2 className="text-2xl font-extrabold tracking-tight text-white flex items-center justify-center gap-2">
+              <span className="text-gradient-apple">9DRIVE VAULT</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-[--accent-blue] font-mono border border-white/10">v1.0</span>
+            </h2>
+
+            <p className="text-xs text-[--text-secondary] mt-1.5 font-medium">
+              {isLoginMode
+                ? (lang === 'id' ? 'Masuk ke Vault Terpadu Anda' : 'Sign in to your Unified Vault')
+                : (lang === 'id' ? 'Buat Akun Vault Baru' : 'Create a New Vault Account')}
+            </p>
           </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight flex items-center justify-center gap-2">
-            Drive Vault <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">v1.0</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            {isLoginMode
-              ? (lang === 'id' ? 'Masuk ke Vault Pribadi Anda' : 'Sign in to your Private Vault')
-              : (lang === 'id' ? 'Buat Akun Vault Baru' : 'Create a New Vault Account')}
-          </p>
-        </div>
 
-        {/* Error Alert */}
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl text-center animate-shake">
-            {errorMsg}
+          {/* Error Alert */}
+          {errorMsg && (
+            <motion.div 
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 p-3 bg-[--accent-red]/10 border border-[--accent-red]/30 text-[--accent-red] text-xs rounded-xl text-center font-medium"
+            >
+              {errorMsg}
+            </motion.div>
+          )}
+
+          {/* Google One-Tap Magic SSO Button */}
+          <div className="mb-5 relative z-10">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const url = await authApi.getGoogleAuthUrl();
+                  if (url) window.location.href = url;
+                } catch (err: any) {
+                  setErrorMsg(lang === 'id' ? 'Gagal menghubungkan Google SSO' : 'Google SSO failed');
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-2xl text-xs font-semibold text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+              style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.10)';
+                e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.4)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+              }}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              <span>{lang === 'id' ? 'Lanjutkan dengan Google (1-Klik Auto-Drive)' : 'Continue with Google (1-Click Auto-Drive)'}</span>
+            </button>
+
+            <div className="flex items-center my-4">
+              <div className="flex-1 border-t border-white/10" />
+              <span className="px-3 text-[10px] text-[--text-muted] uppercase tracking-wider font-mono">
+                {lang === 'id' ? 'atau gunakan email' : 'or use email'}
+              </span>
+              <div className="flex-1 border-t border-white/10" />
+            </div>
           </div>
-        )}
 
-        {/* Form Inputs */}
-        <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
-          {!isLoginMode && (
+          {/* Form Inputs */}
+          <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
+            {!isLoginMode && (
+              <div>
+                <label className="block text-[11px] font-medium text-[--text-secondary] mb-1.5">
+                  {lang === 'id' ? 'Nama Lengkap' : 'Full Name'}
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-3 w-4 h-4 text-[--text-muted]" />
+                  <input
+                    type="text"
+                    required
+                    placeholder={lang === 'id' ? 'Nama Anda' : 'Your name'}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-[--text-muted] outline-none transition-all"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.5)'}
+                    onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                {lang === 'id' ? 'Nama Lengkap' : 'Full Name'}
+              <label className="block text-[11px] font-medium text-[--text-secondary] mb-1.5">
+                Email
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-[--text-muted]" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder={lang === 'id' ? 'Nama Anda' : 'Your name'}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-[#161e31] border border-slate-700/60 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 transition-all"
+                  placeholder="nama@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-[--text-muted] outline-none transition-all"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.5)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
                 />
               </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-              <input
-                type="email"
-                required
-                placeholder="nama@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#161e31] border border-slate-700/60 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 transition-all"
-              />
+            <div>
+              <label className="block text-[11px] font-medium text-[--text-secondary] mb-1.5">
+                {lang === 'id' ? 'Kata Sandi' : 'Password'}
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-[--text-muted]" />
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-[--text-muted] outline-none transition-all"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.5)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-              {lang === 'id' ? 'Kata Sandi' : 'Password'}
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#161e31] border border-slate-700/60 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 transition-all"
-              />
-            </div>
-          </div>
+            {/* Nike Bold Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-nike-bold w-full py-3.5 px-4 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xl disabled:opacity-50 mt-2"
+            >
+              {loading ? (
+                <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>
+                    {isLoginMode
+                      ? (lang === 'id' ? 'MASUK KE VAULT' : 'SIGN IN TO VAULT')
+                      : (lang === 'id' ? 'DAFTAR AKUN VAULT' : 'CREATE VAULT ACCOUNT')}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-cyan-500 via-teal-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/35 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <span>
-                  {isLoginMode
-                    ? (lang === 'id' ? 'Masuk ke Vault' : 'Sign In to Vault')
-                    : (lang === 'id' ? 'Daftar Akun Vault' : 'Create Vault Account')}
-                </span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Toggle Mode */}
-        <div className="mt-6 pt-4 border-t border-slate-800 text-center relative z-10">
-          <p className="text-xs text-slate-400">
-            {isLoginMode
-              ? (lang === 'id' ? 'Belum punya akun Vault?' : "Don't have a Vault account?")
-              : (lang === 'id' ? 'Sudah punya akun Vault?' : 'Already have a Vault account?')}
-            {' '}
+            {/* One-Click Quick Demo Login */}
             <button
               type="button"
-              onClick={() => {
-                setIsLoginMode(!isLoginMode);
-                setErrorMsg('');
+              onClick={handleDemoLogin}
+              disabled={loading}
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-[--text-secondary] hover:text-white transition-all cursor-pointer flex items-center justify-center gap-2"
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
-              className="text-cyan-400 font-semibold hover:underline hover:text-cyan-300 transition-colors ml-1"
             >
-              {isLoginMode
-                ? (lang === 'id' ? 'Daftar Sekarang' : 'Sign Up Now')
-                : (lang === 'id' ? 'Masuk Di Sini' : 'Sign In Here')}
+              <KeyRound className="w-3.5 h-3.5 text-[--accent-blue]" />
+              <span>{lang === 'id' ? 'Masuk Mode Demo (Instant Access)' : 'Quick Demo Access'}</span>
             </button>
-          </p>
-        </div>
+          </form>
 
+          {/* Toggle Mode */}
+          <div className="mt-6 pt-4 border-t border-white/10 text-center relative z-10">
+            <p className="text-xs text-[--text-secondary]">
+              {isLoginMode
+                ? (lang === 'id' ? 'Belum punya akun Vault?' : "Don't have a Vault account?")
+                : (lang === 'id' ? 'Sudah punya akun Vault?' : 'Already have a Vault account?')}
+              {' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoginMode(!isLoginMode);
+                  setErrorMsg('');
+                }}
+                className="font-semibold text-[--accent-blue] hover:underline transition-colors ml-1 cursor-pointer"
+              >
+                {isLoginMode
+                  ? (lang === 'id' ? 'Daftar Sekarang' : 'Sign Up Now')
+                  : (lang === 'id' ? 'Masuk Di Sini' : 'Sign In Here')}
+              </button>
+            </p>
+          </div>
+
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 };

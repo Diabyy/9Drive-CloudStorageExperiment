@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
-import type { DriveAccount, VaultFile, UploadTask, NavView, RoutingStrategy, VirtualFolder } from './types';
-import { INITIAL_ACCOUNTS, INITIAL_FILES } from './data/mockData';
+import type { VaultFile, NavView } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UploadZone } from './components/UploadZone';
@@ -15,37 +15,39 @@ import { ConnectedAccountsView } from './components/ConnectedAccountsView';
 import { UserGuideView } from './components/UserGuideView';
 import { SettingsView } from './components/SettingsView';
 import { AuthModal } from './components/AuthModal';
-import { accountsApi, filesApi, uploadApi, foldersApi, authApi } from './services/api';
+import { accountsApi, filesApi } from './services/api';
+import { LandingPage } from './components/LandingPage';
+import { useVaultData } from './hooks/useVaultData';
 
 import type { Language } from './i18n/translations';
 
-export default function App() {
-  const [lang, setLang] = useState<Language>(() => {
-    return (localStorage.getItem('9drive_lang') as Language) || 'id';
-  });
-
-  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; fullName?: string } | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  const toggleLang = useCallback(() => {
-    setLang(prev => {
-      const next = prev === 'id' ? 'en' : 'id';
-      localStorage.setItem('9drive_lang', next);
-      return next;
-    });
-  }, []);
-
-  const [accounts, setAccounts] = useState<DriveAccount[]>(INITIAL_ACCOUNTS);
-  const [files, setFiles] = useState<VaultFile[]>(INITIAL_FILES);
-  const [folders, setFolders] = useState<VirtualFolder[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [folderPath, setFolderPath] = useState<{ id: string | null; name: string }[]>([
-    { id: null, name: 'Root Vault' },
-  ]);
+function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => void }) {
+  const {
+    currentUser,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    accounts,
+    setAccounts,
+    files,
+    setFiles,
+    folders,
+    currentFolderId,
+    folderPath,
+    routingStrategy,
+    setRoutingStrategy,
+    uploadTasks,
+    toast,
+    showToast,
+    handleAuthSuccess,
+    handleLogout,
+    handleUploadFiles,
+    handleNavigateFolder,
+    handleCreateFolder,
+    handleDeleteFolder,
+    handleDeleteFile,
+  } = useVaultData(lang);
 
   const [activeView, setActiveView] = useState<NavView>('all-files');
-  const [routingStrategy, setRoutingStrategy] = useState<RoutingStrategy>('max-free-space');
-  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -53,211 +55,66 @@ export default function App() {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<VaultFile | null>(null);
   const [transferFile, setTransferFile] = useState<VaultFile | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
+  // Global Drag and Drop state
+  const [isGlobalDragging, setIsGlobalDragging] = useState(false);
 
-  // Fetch folders & files whenever currentFolderId changes
-  const refreshVaultContent = useCallback((folderId: string | null) => {
-    foldersApi.getFolders(folderId)
-      .then(fList => setFolders(fList || []))
-      .catch(() => {});
-
-    filesApi.getFiles({ folderId: folderId || 'root' })
-      .then(fs => { if (fs) setFiles(fs); })
-      .catch(() => {});
-  }, []);
-
-  // Check user session on mount
+  // Keyboard Shortcuts (Space preview, Esc close, Delete file)
   useEffect(() => {
-    const token = localStorage.getItem('9drive_access_token');
-    if (token) {
-      authApi.getMe()
-        .then(res => {
-          setCurrentUser(res.user);
-          setIsAuthModalOpen(false);
-        })
-        .catch(() => {
-          localStorage.removeItem('9drive_access_token');
-          setCurrentUser(null);
-          setIsAuthModalOpen(true);
-        });
-    } else {
-      setIsAuthModalOpen(true);
-    }
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
 
-  const handleAuthSuccess = useCallback((user: { id: string; email: string; fullName?: string }) => {
-    setCurrentUser(user);
-    setIsAuthModalOpen(false);
-    showToast(lang === 'id' ? `Selamat datang, ${user.fullName || user.email}!` : `Welcome, ${user.fullName || user.email}!`, 'success');
-    accountsApi.getAccounts()
-      .then(accs => setAccounts(accs || []))
-      .catch(() => setAccounts([]));
-    refreshVaultContent(currentFolderId);
-  }, [currentFolderId, lang, refreshVaultContent, showToast]);
-
-  const handleLogout = useCallback(() => {
-    authApi.logout();
-    setCurrentUser(null);
-    setAccounts([]);
-    setFiles([]);
-    setFolders([]);
-    setIsAuthModalOpen(true);
-    showToast(lang === 'id' ? 'Berhasil keluar dari Vault.' : 'Successfully logged out.', 'success');
-  }, [lang, showToast]);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    accountsApi.getAccounts()
-      .then(accs => { setAccounts(accs || []); })
-      .catch(() => setAccounts([]));
-
-    refreshVaultContent(currentFolderId);
-  }, [currentUser, currentFolderId, refreshVaultContent]);
-
-  // Handle OAuth callback redirect URL params
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const isConnected = params.get('connected');
-    const connectedEmail = params.get('email');
-
-    if (code) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      authApi.exchangeGoogleCode(code)
-        .then((res) => {
-          accountsApi.getAccounts()
-            .then(accs => { if (accs?.length) setAccounts(accs); })
-            .catch(() => {});
-          showToast(`Berhasil Menghubungkan Google Drive: ${res.email}`, 'success');
-        })
-        .catch((err: any) => {
-          showToast(`OAuth Error: ${err.response?.data?.error || err.message}`, 'error');
-        });
-    } else if (isConnected === 'true' && connectedEmail) {
-      accountsApi.getAccounts()
-        .then(accs => { if (accs?.length) setAccounts(accs); })
-        .catch(() => {});
-      showToast(`Connected Google Drive: ${connectedEmail}`, 'success');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    const errorParam = params.get('error');
-    if (errorParam) {
-      if (errorParam === 'access_denied') {
-        showToast('Koneksi Google Drive dibatalkan.', 'error');
-      } else {
-        showToast(`OAuth Error: ${errorParam}`, 'error');
+      if (e.code === 'Escape') {
+        setPreviewFile(null);
+        setTransferFile(null);
+        setIsConnectModalOpen(false);
       }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [showToast]);
+    };
 
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-
-
-  // Upload handler — streams to real Google Drive via backend
-  const handleUploadFiles = useCallback((fileList: FileList) => {
-    if (!accounts.length) {
-      showToast('Connect a Google Drive account first!', 'error');
-      return;
-    }
-    let target = accounts[0];
-    if (routingStrategy === 'max-free-space') {
-      target = [...accounts].sort((a, b) => (b.totalStorageGB - b.usedStorageGB) - (a.totalStorageGB - a.usedStorageGB))[0];
-    } else if (routingStrategy === 'priority-first') {
-      target = accounts.find(a => a.isPrimary) || accounts[0];
-    } else {
-      target = accounts[Math.floor(Math.random() * accounts.length)];
-    }
-
-    Array.from(fileList).forEach((file, i) => {
-      const taskId = `task-${Date.now()}-${i}`;
-      const newTask: UploadTask = {
-        id: taskId,
-        fileName: file.name,
-        fileSizeBytes: file.size || 5_000_000,
-        formattedSize: `${(file.size / 1e6).toFixed(2)} MB`,
-        targetDriveId: target.id,
-        targetDriveEmail: target.email,
-        progressPercentage: 3,
-        uploadSpeedMbps: 4.2,
-        status: 'uploading',
-        startedAt: Date.now(),
-      };
-      setUploadTasks(prev => [newTask, ...prev]);
-
-      // Real upload to backend → Google Drive
-      uploadApi.uploadFile(file, currentFolderId || undefined, (pct, speed) => {
-        setUploadTasks(prev => prev.map(t =>
-          t.id === taskId ? { ...t, progressPercentage: pct, uploadSpeedMbps: speed } : t
-        ));
-      }).then(savedFile => {
-        setUploadTasks(prev => prev.map(t =>
-          t.id === taskId ? { ...t, status: 'completed', progressPercentage: 100 } : t
-        ));
-        setFiles(prev => [savedFile, ...prev]);
-        const sizeGB = (file.size || 0) / 1e9;
-        setAccounts(prev => prev.map(a =>
-          a.id === target.id ? { ...a, usedStorageGB: a.usedStorageGB + sizeGB } : a
-        ));
-        showToast(`Uploaded "${file.name}" to ${target.email}`);
-      }).catch(err => {
-        setUploadTasks(prev => prev.map(t =>
-          t.id === taskId ? { ...t, status: 'error' } : t
-        ));
-        showToast(`Upload failed: ${file.name}`, 'error');
-      });
-    });
-  }, [accounts, routingStrategy, currentFolderId, showToast]);
-
-  // Virtual Folder Handlers
-  const handleNavigateFolder = useCallback((folderId: string | null) => {
-    setCurrentFolderId(folderId);
-    if (folderId === null) {
-      setFolderPath([{ id: null, name: 'Root Vault' }]);
-    } else {
-      const folder = folders.find(f => f.id === folderId);
-      if (folder) {
-        setFolderPath(prev => {
-          const idx = prev.findIndex(p => p.id === folderId);
-          if (idx >= 0) return prev.slice(0, idx + 1);
-          return [...prev, { id: folder.id, name: folder.name }];
-        });
+  // Global Drag & Drop Listener
+  useEffect(() => {
+    let dragCounter = 0;
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter++;
+      if (e.dataTransfer?.types.includes('Files')) {
+        setIsGlobalDragging(true);
       }
-    }
-  }, [folders]);
+    };
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        setIsGlobalDragging(false);
+        dragCounter = 0;
+      }
+    };
+    const handleDragOver = (e: DragEvent) => e.preventDefault();
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter = 0;
+      setIsGlobalDragging(false);
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        handleUploadFiles(e.dataTransfer.files);
+      }
+    };
 
-  const handleCreateFolder = useCallback((name: string) => {
-    foldersApi.createFolder(name, currentFolderId)
-      .then(newFolder => {
-        setFolders(prev => [...prev, newFolder]);
-        showToast(`Folder "${name}" dibuat!`, 'success');
-      })
-      .catch(err => showToast(`Gagal membuat folder: ${err.message}`, 'error'));
-  }, [currentFolderId, showToast]);
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
 
-  const handleDeleteFolder = useCallback((folderId: string) => {
-    foldersApi.deleteFolder(folderId)
-      .then(() => {
-        setFolders(prev => prev.filter(f => f.id !== folderId));
-        showToast('Folder dihapus', 'success');
-      })
-      .catch(err => showToast(`Gagal menghapus folder: ${err.message}`, 'error'));
-  }, [showToast]);
-
-  const handleDeleteFile = useCallback((fileId: string) => {
-    const f = files.find(f => f.id === fileId);
-    if (!f) return;
-    const gb = Number((f.sizeBytes / 1e9).toFixed(3)) || 0.01;
-    setFiles(prev => prev.filter(x => x.id !== fileId));
-    setAccounts(accs => accs.map(a => a.id === f.driveId ? { ...a, usedStorageGB: Math.max(0, a.usedStorageGB - gb) } : a));
-  }, [files]);
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [handleUploadFiles]);
 
   const handleTransferFile = useCallback((fileId: string, targetDriveId: string) => {
     const file = files.find(f => f.id === fileId);
@@ -346,7 +203,70 @@ export default function App() {
         />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+        <main className="flex-1 overflow-hidden flex flex-col min-w-0 relative">
+          
+          {/* Pillar 2: Guided Onboarding 3-Step Wizard Banner for new users */}
+          {accounts.length === 0 && (
+            <div
+              className="m-4 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0"
+              style={{
+                background: 'rgba(41, 151, 255, 0.08)',
+                border: '1px solid rgba(41, 151, 255, 0.25)',
+                backdropFilter: 'blur(20px)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[--accent-blue] text-black font-extrabold flex items-center justify-center text-sm shrink-0">
+                  ⚡
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[--text-primary]">
+                    {lang === 'id' ? 'Selamat Datang di 9DRIVE Vault! Mulai dalam 3 Langkah:' : 'Welcome to 9DRIVE Vault! Get started in 3 steps:'}
+                  </h4>
+                  <div className="flex flex-wrap gap-2 text-[11px] text-[--text-secondary] mt-0.5">
+                    <span className="font-semibold text-[--accent-blue]">1. Hubungkan Google Drive</span> &bull; 
+                    <span>2. Pilih Strategi Router</span> &bull; 
+                    <span>3. Unggah Berkas Pertama</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsConnectModalOpen(true)}
+                className="btn-nike-bold py-2 px-4 text-xs shrink-0 cursor-pointer shadow-md"
+              >
+                + {lang === 'id' ? 'Hubungkan Google Drive' : 'Connect Google Drive'}
+              </button>
+            </div>
+          )}
+
+          {/* Pillar 3: Global Full-screen Drag & Drop Overlay */}
+          <AnimatePresence>
+            {isGlobalDragging && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 text-center pointer-events-none"
+                style={{
+                  background: 'rgba(9, 9, 11, 0.90)',
+                  backdropFilter: 'blur(24px)',
+                  border: '2px dashed var(--accent-blue)',
+                }}
+              >
+                <div className="w-20 h-20 rounded-3xl bg-[--accent-blue]/10 border border-[--accent-blue]/30 flex items-center justify-center text-[--accent-blue] mb-4 animate-bounce">
+                  <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-extrabold text-[--text-primary] tracking-tight">
+                  {lang === 'id' ? 'Lepaskan Berkas di Mana Saja untuk Mengunggah' : 'Drop Files Anywhere to Upload'}
+                </h3>
+                <p className="text-xs text-[--text-secondary] mt-1 max-w-md">
+                  {lang === 'id' ? '9DRIVE akan mengalirkan berkas ini langsung ke Google Drive Anda tanpa perantara server.' : '9DRIVE will stream files directly into your Google Drive.'}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence mode="wait">
             {isFileView ? (
               <motion.div
@@ -425,5 +345,29 @@ export default function App() {
         lang={lang}
       />
     </div>
+  );
+}
+
+export default function App() {
+  const [lang, setLang] = useState<Language>(() => {
+    return (localStorage.getItem('9drive_lang') as Language) || 'id';
+  });
+
+  const toggleLang = useCallback(() => {
+    setLang(prev => {
+      const next = prev === 'id' ? 'en' : 'id';
+      localStorage.setItem('9drive_lang', next);
+      return next;
+    });
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage lang={lang} onToggleLang={toggleLang} />} />
+        <Route path="/app" element={<Dashboard lang={lang} toggleLang={toggleLang} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

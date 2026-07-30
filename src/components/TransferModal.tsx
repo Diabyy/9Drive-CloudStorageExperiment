@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, MoveRight, HardDrive, Zap, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, MoveRight, HardDrive, Zap, Loader2 } from 'lucide-react';
 import { VaultFile, DriveAccount } from '../types';
 
 interface TransferModalProps {
@@ -36,84 +37,132 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-[#111827] border border-cyan-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl font-mono text-xs">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+    <AnimatePresence>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 16 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-md rounded-3xl p-7 text-left overflow-hidden"
+          style={{
+            background: 'rgba(18, 18, 22, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.8), 0 0 40px rgba(41, 151, 255, 0.12)',
+          }}
         >
-          <X className="w-4 h-4" />
-        </button>
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 w-8 h-8 rounded-xl flex items-center justify-center text-[--text-muted] hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
 
-        <div className="flex items-center gap-3 mb-5">
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-indigo-400">
-            <MoveRight className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-black text-white uppercase tracking-wider">
-              Cross-Drive File Transfer
-            </h3>
-            <p className="text-xs text-gray-400 font-sans">
-              Stream file chunks between Google Drive accounts.
-            </p>
-          </div>
-        </div>
-
-        <div className="p-3.5 bg-gray-900/90 rounded-2xl border border-gray-800 space-y-1 mb-5">
-          <span className="text-[10px] text-gray-500 uppercase font-bold">Selected File</span>
-          <p className="text-xs font-bold text-cyan-300 truncate">{file.name}</p>
-          <p className="text-[11px] text-gray-400">Size: {file.formattedSize}</p>
-        </div>
-
-        <form onSubmit={handleExecuteTransfer} className="space-y-4">
-          <div>
-            <label className="block text-[11px] font-bold text-gray-300 uppercase mb-1">
-              Source Drive
-            </label>
-            <div className="p-3 rounded-xl bg-gray-950 border border-gray-800 text-gray-400 flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-cyan-400" />
-              <span>{currentDrive?.name} ({currentDrive?.email})</span>
+          {/* Header */}
+          <div className="flex items-center gap-3.5 mb-5">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg"
+              style={{ background: 'var(--accent-purple)' }}
+            >
+              <MoveRight className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-[--text-primary] tracking-tight">
+                Migrasi Berkas Antar-Drive
+              </h3>
+              <p className="text-xs text-[--text-secondary] mt-0.5 font-normal">
+                Alirkan chunk berkas langsung antar akun Google Drive
+              </p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-gray-300 uppercase mb-1">
-              Destination Target Drive
-            </label>
-            <select
-              required
-              value={selectedTargetDriveId}
-              onChange={(e) => setSelectedTargetDriveId(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 focus:border-cyan-500 rounded-xl p-3 text-white outline-none font-mono"
-            >
-              <option value="">-- Select Destination Drive --</option>
-              {availableTargets.map((acc) => {
-                const freeGB = (acc.totalStorageGB - acc.usedStorageGB).toFixed(1);
-                return (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.email}) &mdash; {freeGB} GB Free
-                  </option>
-                );
-              })}
-            </select>
+          {/* Selected File Info */}
+          <div
+            className="p-4 rounded-2xl mb-5 space-y-1"
+            style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            <span className="text-[10px] text-[--text-muted] uppercase font-bold tracking-wider">Berkas Terpilih</span>
+            <p className="text-xs font-bold text-[--accent-blue] truncate">{file.name}</p>
+            <p className="text-[11px] text-[--text-secondary]">Ukuran: {file.formattedSize}</p>
           </div>
 
-          <button
-            type="submit"
-            disabled={!selectedTargetDriveId || isTransferring}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-extrabold uppercase tracking-widest text-xs shadow-lg shadow-indigo-500/20 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isTransferring ? (
-              <span>Streaming Chunks across Drives...</span>
-            ) : (
-              <>
-                <Zap className="w-4 h-4 fill-white" />
-                <span>Execute Cross-Drive Migration</span>
-              </>
-            )}
-          </button>
-        </form>
+          <form onSubmit={handleExecuteTransfer} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-[--text-secondary] uppercase mb-1.5">
+                Drive Asal
+              </label>
+              <div
+                className="p-3 rounded-xl text-xs text-[--text-secondary] flex items-center gap-2"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                <HardDrive className="w-4 h-4 text-[--accent-blue]" strokeWidth={1.5} />
+                <span className="truncate">{currentDrive?.name} ({currentDrive?.email})</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-[--text-secondary] uppercase mb-1.5">
+                Drive Tujuan
+              </label>
+              <select
+                required
+                value={selectedTargetDriveId}
+                onChange={(e) => setSelectedTargetDriveId(e.target.value)}
+                className="w-full rounded-xl p-3 text-xs text-white outline-none cursor-pointer"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                }}
+              >
+                <option value="" className="bg-[#121216]">-- Pilih Drive Tujuan --</option>
+                {availableTargets.map((acc) => {
+                  const freeGB = (acc.totalStorageGB - acc.usedStorageGB).toFixed(1);
+                  return (
+                    <option key={acc.id} value={acc.id} className="bg-[#121216]">
+                      {acc.name} ({acc.email}) &mdash; {freeGB} GB Bebas
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!selectedTargetDriveId || isTransferring}
+              className="btn-nike-bold w-full py-3.5 px-4 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xl disabled:opacity-50 mt-2"
+            >
+              {isTransferring ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Mengalihkan Chunk Berkas…
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-black" fill="currentColor" />
+                  <span>EKSEKUSI MIGRASI BERKAS</span>
+                </>
+              )}
+            </button>
+          </form>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 };

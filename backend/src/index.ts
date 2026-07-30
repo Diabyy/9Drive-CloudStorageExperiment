@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import { generateAuthUrl, exchangeCodeForTokens, streamUploadToDrive, getAuthenticatedDriveClient, getOrCreateVaultFolder } from './services/googleDrive.js';
 import { encryptToken } from './services/crypto.js';
 import { backupDatabaseToDrive } from './services/dbBackup.js';
+import { asyncHandler } from './utils/asyncHandler.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -78,78 +79,66 @@ app.get('/health', (_req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTHENTICATION ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/v1/auth/register', async (req, res) => {
+app.post('/api/v1/auth/register', asyncHandler(async (req, res) => {
   const { email, password, fullName } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  try {
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-    if (existing) {
-      return res.status(400).json({ error: 'Email is already registered' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase().trim(),
-        passwordHash,
-        fullName: fullName?.trim() || email.split('@')[0],
-      },
-    });
-
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({
-      success: true,
-      accessToken,
-      user: { id: user.id, email: user.email, fullName: user.fullName },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Registration failed' });
+  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (existing) {
+    return res.status(400).json({ error: 'Email is already registered' });
   }
-});
 
-app.post('/api/v1/auth/login', async (req, res) => {
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await prisma.user.create({
+    data: {
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      fullName: fullName?.trim() || email.split('@')[0],
+    },
+  });
+
+  const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({
+    success: true,
+    accessToken,
+    user: { id: user.id, email: user.email, fullName: user.fullName },
+  });
+}));
+
+app.post('/api/v1/auth/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  try {
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-    if (!user || !user.passwordHash) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({
-      success: true,
-      accessToken,
-      user: { id: user.id, email: user.email, fullName: user.fullName },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Login failed' });
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user || !user.passwordHash) {
+    return res.status(401).json({ error: 'Invalid email or password' });
   }
-});
 
-app.get('/api/v1/auth/me', authenticateJwt, async (req: AuthRequest, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      select: { id: true, email: true, fullName: true, avatarUrl: true, role: true },
-    });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to fetch user' });
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isValid) {
+    return res.status(401).json({ error: 'Invalid email or password' });
   }
-});
+
+  const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({
+    success: true,
+    accessToken,
+    user: { id: user.id, email: user.email, fullName: user.fullName },
+  });
+}));
+
+app.get('/api/v1/auth/me', authenticateJwt, asyncHandler(async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, email: true, fullName: true, avatarUrl: true, role: true },
+  });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ user });
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH — Generate Google OAuth URL
@@ -163,62 +152,103 @@ app.get('/api/v1/auth/google/url', (_req, res) => {
   }
 });
 
+// OAuth Redirect Callback handler for Google Console Redirect URIs
+app.get(['/connected-accounts/google/callback', '/api/v1/auth/google/callback'], (req, res) => {
+  const code = req.query.code as string;
+  const error = req.query.error as string;
+  if (code) {
+    return res.redirect(`${FRONTEND_URL}/app?code=${encodeURIComponent(code)}`);
+  }
+  if (error) {
+    return res.redirect(`${FRONTEND_URL}/app?error=${encodeURIComponent(error)}`);
+  }
+  return res.redirect(`${FRONTEND_URL}/app`);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH — Google OAuth Code Exchange (Frontend Callback)
+// AUTH — Google OAuth Code Exchange (Frontend Callback & 1-Click Magic SSO)
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/v1/auth/google/exchange', authenticateJwt, async (req: AuthRequest, res) => {
+app.post('/api/v1/auth/google/exchange', asyncHandler(async (req: AuthRequest, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Missing code' });
 
-  try {
-    const result = await exchangeCodeForTokens(code);
-    const refreshToken = result.tokens.refresh_token || result.tokens.access_token || '';
-    const encryptedAccess = encryptToken(result.tokens.access_token || '');
-    const encryptedRefresh = encryptToken(refreshToken);
+  const result = await exchangeCodeForTokens(code);
+  const refreshToken = result.tokens.refresh_token || result.tokens.access_token || '';
+  const encryptedAccess = encryptToken(result.tokens.access_token || '');
+  const encryptedRefresh = encryptToken(refreshToken);
 
-    const userId = req.user!.id;
-
-    let rootFolderId: string | null = null;
+  // Check if JWT token present in request header
+  let userId: string | null = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
-      rootFolderId = await getOrCreateVaultFolder(encryptedRefresh);
-    } catch (fErr) {
-      console.warn('Could not auto-create 9DRIVE_VAULT folder during OAuth exchange:', fErr);
-    }
+      const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as { id: string };
+      userId = decoded.id;
+    } catch {}
+  }
 
-    const account = await prisma.connectedAccount.upsert({
-      where: { userId_accountEmail: { userId, accountEmail: result.email } },
-      update: {
-        accessTokenEnc: encryptedAccess,
-        refreshTokenEnc: encryptedRefresh,
-        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
-        totalQuotaBytes: result.totalQuotaBytes,
-        usedQuotaBytes: result.usedQuotaBytes,
-        rootDriveFolderId: rootFolderId,
-        isActive: true,
-        lastSyncedAt: new Date(),
-      },
+  // If no logged in user, upsert User by Google email
+  let user;
+  if (!userId) {
+    user = await prisma.user.upsert({
+      where: { email: result.email.toLowerCase().trim() },
+      update: { fullName: result.name || result.email.split('@')[0] },
       create: {
-        userId,
-        accountEmail: result.email,
-        accountName: result.name,
-        provider: 'GOOGLE_DRIVE',
-        accessTokenEnc: encryptedAccess,
-        refreshTokenEnc: encryptedRefresh,
-        tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
-        totalQuotaBytes: result.totalQuotaBytes,
-        usedQuotaBytes: result.usedQuotaBytes,
-        rootDriveFolderId: rootFolderId,
-        isActive: true,
+        email: result.email.toLowerCase().trim(),
+        fullName: result.name || result.email.split('@')[0],
       },
     });
-
-    backupDatabaseToDrive(encryptedRefresh);
-    res.json({ success: true, email: result.email, account });
-  } catch (error: any) {
-    console.error('OAuth Exchange Error:', error);
-    res.status(500).json({ error: error.message || 'OAuth code exchange failed' });
+    userId = user.id;
+  } else {
+    user = await prisma.user.findUnique({ where: { id: userId } });
   }
-});
+
+  let rootFolderId: string | null = null;
+  try {
+    rootFolderId = await getOrCreateVaultFolder(encryptedRefresh);
+  } catch (fErr) {
+    console.warn('Could not auto-create 9DRIVE_VAULT folder during OAuth exchange:', fErr);
+  }
+
+  const account = await prisma.connectedAccount.upsert({
+    where: { userId_accountEmail: { userId, accountEmail: result.email } },
+    update: {
+      accessTokenEnc: encryptedAccess,
+      refreshTokenEnc: encryptedRefresh,
+      tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
+      totalQuotaBytes: result.totalQuotaBytes,
+      usedQuotaBytes: result.usedQuotaBytes,
+      rootDriveFolderId: rootFolderId,
+      isActive: true,
+      lastSyncedAt: new Date(),
+    },
+    create: {
+      userId,
+      accountEmail: result.email,
+      accountName: result.name,
+      provider: 'GOOGLE_DRIVE',
+      accessTokenEnc: encryptedAccess,
+      refreshTokenEnc: encryptedRefresh,
+      tokenExpiresAt: new Date(result.tokens.expiry_date || Date.now() + 3600 * 1000),
+      totalQuotaBytes: result.totalQuotaBytes,
+      usedQuotaBytes: result.usedQuotaBytes,
+      rootDriveFolderId: rootFolderId,
+      isActive: true,
+    },
+  });
+
+  backupDatabaseToDrive(encryptedRefresh);
+
+  const accessToken = jwt.sign({ id: userId, email: result.email }, JWT_SECRET, { expiresIn: '7d' });
+
+  res.json({
+    success: true,
+    accessToken,
+    user: { id: user?.id, email: user?.email, fullName: user?.fullName },
+    email: result.email,
+    account,
+  });
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/connected-accounts — List connected accounts for logged-in user

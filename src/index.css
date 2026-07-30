@@ -1,23 +1,46 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @import "tailwindcss";
 
-/* ─── Design Token CSS Variables ─────────────────────────────── */
+/* ─── Apple & Nike Hybrid Design Tokens ───────────────────────── */
 :root {
-  --canvas: #070A10;
-  --surface-1: #0C1220;
-  --surface-2: #111827;
-  --surface-3: #1a2235;
-  --border-subtle: rgba(51, 65, 85, 0.6);
-  --border-glow: rgba(6, 182, 212, 0.35);
-  --accent-cyan: #06B6D4;
-  --accent-indigo: #6366F1;
-  --accent-emerald: #10B981;
-  --accent-rose: #F43F5E;
-  --accent-amber: #F59E0B;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #475569;
+  /* Canvas & Surfaces */
+  --canvas: #09090b;
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.09);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-glass: rgba(255, 255, 255, 0.12);
+
+  /* Brand Accent Palette (Apple & Nike Hybrid) */
+  --accent-blue: #2997FF;
+  --accent-purple: #BF5AF2;
+  --accent-green: #30D158;
+  --accent-red: #FF453A;
+  --accent-orange: #FF9F0A;
+  --accent-volt: #CCFF00; /* Nike Volt Accent */
+
+  /* Text */
+  --text-primary: #F5F5F7;
+  --text-secondary: #A1A1AA;
+  --text-muted: #52525B;
+
+  /* Radii */
+  --radius-card: 24px;
+  --radius-button: 14px;
+  --radius-input: 12px;
+  --radius-pill: 9999px;
+
+  /* Legacy aliases */
+  --accent-cyan: var(--accent-blue);
+  --accent-indigo: var(--accent-purple);
+  --accent-emerald: var(--accent-green);
+  --accent-rose: var(--accent-red);
+  --accent-amber: var(--accent-orange);
+  --border-glow: var(--border-strong);
 }
 
 /* ─── Base Styles ─────────────────────────────────────────────── */
@@ -32,163 +55,127 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Inter', 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   background-color: var(--canvas);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
+  overflow-x: hidden;
+  letter-spacing: -0.015em;
 }
 
-/* ─── Scrollbar Styling ───────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
-
-/* ─── Keyframe Animations ─────────────────────────────────────── */
-@keyframes pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4), 0 0 0 0 rgba(99, 102, 241, 0.2); }
-  50% { box-shadow: 0 0 0 12px rgba(6, 182, 212, 0), 0 0 0 24px rgba(99, 102, 241, 0); }
+/* Background Grid Mesh */
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+.bg-dots-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-@keyframes float-up {
-  0% { opacity: 0; transform: translateY(16px); }
-  100% { opacity: 1; transform: translateY(0); }
+/* Metallic Text Gradient (Apple & Nike Style) */
+.text-gradient-apple {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-@keyframes glow-border {
-  0%, 100% { border-color: rgba(6, 182, 212, 0.3); }
-  50% { border-color: rgba(99, 102, 241, 0.6); }
+.text-gradient-electric {
+  background: linear-gradient(135deg, #2997FF 0%, #BF5AF2 50%, #CCFF00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.text-gradient-gold {
+  background: linear-gradient(180deg, #FFE600 0%, #FF9F0A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-@keyframes status-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* ─── Utility Classes ─────────────────────────────────────────── */
+/* ─── Apple Glass Surfaces ───────────────────────────────────── */
 .glass-surface {
-  background: rgba(15, 23, 42, 0.70);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
 }
 
-.glass-surface-light {
-  background: rgba(26, 34, 53, 0.60);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(51, 65, 85, 0.4);
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-card);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.glow-text {
-  background: linear-gradient(135deg, #06B6D4, #6366F1);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 30px rgba(41, 151, 255, 0.1);
 }
 
-.glow-text-emerald {
-  background: linear-gradient(135deg, #10B981, #06B6D4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
+/* Buttons */
 .btn-primary {
-  background: linear-gradient(135deg, #06B6D4, #6366F1);
+  background: var(--accent-blue);
   color: white;
   border: none;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-button);
+  font-weight: 600;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(41, 151, 255, 0.3);
 }
 
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
-  opacity: 0;
-  transition: opacity 0.2s;
+.btn-primary:hover {
+  background: #3b9eff;
+  transform: scale(1.02);
+  box-shadow: 0 6px 28px rgba(41, 151, 255, 0.45);
 }
 
-.btn-primary:hover::after { opacity: 1; }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(6, 182, 212, 0.35); }
-.btn-primary:active { transform: scale(0.97); }
-
-.pulse-ring { animation: pulse-ring 2.5s ease-in-out infinite; }
-.status-blink { animation: status-blink 2s ease-in-out infinite; }
-.spin-slow { animation: spin-slow 8s linear infinite; }
-.float-up { animation: float-up 0.4s ease-out forwards; }
-
-.shimmer-bg {
-  background: linear-gradient(90deg, #06B6D4 0%, #6366F1 50%, #06B6D4 100%);
-  background-size: 200% auto;
-  animation: shimmer 2.5s linear infinite;
-}
-
-.neon-border-cyan { border-color: rgba(6, 182, 212, 0.5) !important; box-shadow: 0 0 16px rgba(6, 182, 212, 0.15); }
-.neon-border-indigo { border-color: rgba(99, 102, 241, 0.5) !important; box-shadow: 0 0 16px rgba(99, 102, 241, 0.15); }
-
-/* ─── Progress Bar ────────────────────────────────────────────── */
-.progress-track {
-  background: rgba(30, 41, 59, 0.8);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  border-radius: 99px;
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-  animation: shimmer 2s linear infinite;
-}
-
-/* ─── Drag-and-Drop Zone ──────────────────────────────────────── */
-.dropzone-idle {
-  border: 2px dashed rgba(99, 102, 241, 0.35);
-  transition: all 0.3s ease;
-}
-
-.dropzone-active {
-  border: 2px dashed rgba(6, 182, 212, 0.8);
-  background: rgba(6, 182, 212, 0.05);
-  box-shadow: 0 0 32px rgba(6, 182, 212, 0.15), inset 0 0 32px rgba(6, 182, 212, 0.05);
-  animation: glow-border 1.5s ease-in-out infinite;
-}
-
-/* ─── Typography ──────────────────────────────────────────────── */
-.heading-kinetic {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+.btn-nike-bold {
+  background: #FFFFFF;
+  color: #000000;
   font-weight: 800;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-button);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.heading-mono {
-  font-family: 'Space Grotesk', monospace;
-  letter-spacing: 0.06em;
+.btn-nike-bold:hover {
+  background: var(--accent-volt);
+  color: #000000;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 30px rgba(204, 255, 0, 0.3);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* Animation Utilities */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.heading-kinetic {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }

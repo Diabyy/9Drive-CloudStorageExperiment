@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   HelpCircle, ShieldCheck, Zap, HardDrive, ArrowRight, CheckCircle2,
-  Sparkles, Layers, RefreshCw, Lock, FileText, Cpu, ChevronDown, ChevronUp,
+  Sparkles, Layers, Cpu, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import type { DriveAccount } from '../types';
-
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
 
@@ -71,34 +70,44 @@ export function UserGuideView({ onConnectClick, accounts, lang = 'id' }: Props) 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-surface rounded-3xl p-6 sm:p-8 border border-cyan-500/30 relative overflow-hidden shadow-2xl"
+          className="rounded-3xl p-6 sm:p-8 border relative overflow-hidden"
+          style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(30px)',
+          }}
         >
-          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-cyan-500/10 via-indigo-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-          
           <div className="flex items-center gap-3 mb-3">
-            <span className="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-semibold flex items-center gap-1.5">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5"
+              style={{
+                background: 'rgba(41, 151, 255, 0.10)',
+                color: 'var(--accent-blue)',
+                border: '1px solid rgba(41, 151, 255, 0.20)',
+              }}
+            >
               <Sparkles className="w-3.5 h-3.5" />
               Human-Centric Guide
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-50 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[--text-primary] tracking-tight">
             {t.guideTitle}
           </h1>
           
-          <p className="text-sm text-slate-400 mt-2 max-w-2xl leading-relaxed">
+          <p className="text-sm text-[--text-secondary] mt-2 max-w-2xl leading-relaxed">
             {t.guideSubtitle}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <button
               onClick={onConnectClick}
-              className="btn-primary px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider flex items-center gap-2"
+              className="btn-primary px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider flex items-center gap-2 cursor-pointer shadow-lg"
             >
               <span>{t.connectDriveBtn}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-[--text-muted]">
               {accounts.length} {t.drives} ({accounts.reduce((s, a) => s + a.totalStorageGB, 0).toFixed(1)} GB total)
             </span>
           </div>
@@ -107,83 +116,70 @@ export function UserGuideView({ onConnectClick, accounts, lang = 'id' }: Props) 
         {/* 3 Step Workflow Bento Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            {
-              step: '01',
-              title: t.step1Title,
-              desc: t.step1Desc,
-              icon: HardDrive,
-              color: 'text-cyan-400',
-              bg: 'bg-cyan-500/10',
-            },
-            {
-              step: '02',
-              title: t.step2Title,
-              desc: t.step2Desc,
-              icon: Zap,
-              color: 'text-indigo-400',
-              bg: 'bg-indigo-500/10',
-            },
-            {
-              step: '03',
-              title: t.step3Title,
-              desc: t.step3Desc,
-              icon: Layers,
-              color: 'text-emerald-400',
-              bg: 'bg-emerald-500/10',
-            },
+            { step: '01', title: t.step1Title, desc: t.step1Desc, icon: HardDrive, color: 'var(--accent-blue)', bg: 'rgba(41, 151, 255, 0.10)' },
+            { step: '02', title: t.step2Title, desc: t.step2Desc, icon: Zap, color: 'var(--accent-purple)', bg: 'rgba(191, 90, 242, 0.10)' },
+            { step: '03', title: t.step3Title, desc: t.step3Desc, icon: Layers, color: 'var(--accent-green)', bg: 'rgba(48, 209, 88, 0.10)' },
           ].map(({ step, title, desc, icon: Icon, color, bg }, idx) => (
             <motion.div
               key={step}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              whileHover={{ y: -4, borderColor: 'rgba(6,182,212,0.4)' }}
-              className="glass-surface rounded-2xl p-5 border border-slate-700/40 relative flex flex-col justify-between"
+              whileHover={{ y: -3 }}
+              className="rounded-2xl p-5 border relative flex flex-col justify-between"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderColor: 'rgba(255, 255, 255, 0.06)',
+              }}
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg}`}>
-                    <Icon className={`w-5 h-5 ${color}`} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: bg, color }}>
+                    <Icon className="w-5 h-5" strokeWidth={1.5} />
                   </div>
-                  <span className="text-2xl font-black text-slate-700 font-mono">{step}</span>
+                  <span className="text-2xl font-black text-white/20 font-mono">{step}</span>
                 </div>
-                <h3 className="text-sm font-bold text-slate-100 mb-1.5">{title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+                <h3 className="text-sm font-bold text-[--text-primary] mb-1.5">{title}</h3>
+                <p className="text-xs text-[--text-secondary] leading-relaxed">{desc}</p>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Dynamic Analogy Card (Human ELI5 Explanation) */}
+        {/* Dynamic Analogy Card */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-surface rounded-2xl p-6 border border-slate-700/40 space-y-4"
+          className="rounded-2xl p-6 border space-y-4"
+          style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderColor: 'rgba(255, 255, 255, 0.06)',
+          }}
         >
           <div className="flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-indigo-400" />
-            <h3 className="heading-kinetic text-xs text-slate-400 tracking-widest uppercase">
+            <Cpu className="w-5 h-5 text-[--accent-purple]" strokeWidth={1.5} />
+            <h3 className="text-xs font-semibold text-[--text-muted] tracking-wider uppercase">
               {t.howItWorksTitle}
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-300">
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
-              <span className="font-bold text-cyan-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-[--text-secondary]">
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+              <span className="font-bold text-[--accent-blue] flex items-center gap-1.5 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-[--accent-green]" />
                 {t.hoseAnalogyTitle}
               </span>
-              <p className="text-slate-400 leading-relaxed">
+              <p className="leading-relaxed">
                 {t.hoseAnalogyDesc}
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
-              <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" />
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+              <span className="font-bold text-[--accent-green] flex items-center gap-1.5 text-sm">
+                <ShieldCheck className="w-4 h-4 text-[--accent-green]" />
                 {t.securityTitle}
               </span>
-              <p className="text-slate-400 leading-relaxed">
+              <p className="leading-relaxed">
                 {t.securityDesc}
               </p>
             </div>
@@ -193,8 +189,8 @@ export function UserGuideView({ onConnectClick, accounts, lang = 'id' }: Props) 
         {/* FAQ Accordion */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <HelpCircle className="w-5 h-5 text-cyan-400" />
-            <h3 className="heading-kinetic text-xs text-slate-400 tracking-widest uppercase">
+            <HelpCircle className="w-5 h-5 text-[--accent-blue]" strokeWidth={1.5} />
+            <h3 className="text-xs font-semibold text-[--text-muted] tracking-wider uppercase">
               {t.faqTitle}
             </h3>
           </div>
@@ -205,14 +201,18 @@ export function UserGuideView({ onConnectClick, accounts, lang = 'id' }: Props) 
               return (
                 <div
                   key={faq.q}
-                  className="glass-surface rounded-xl border border-slate-800 overflow-hidden transition-colors"
+                  className="rounded-xl border overflow-hidden transition-all"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderColor: 'rgba(255, 255, 255, 0.06)',
+                  }}
                 >
                   <button
                     onClick={() => setOpenFaq(isOpen ? null : idx)}
-                    className="w-full px-5 py-3.5 text-left text-xs font-semibold text-slate-200 flex items-center justify-between gap-3 cursor-pointer hover:text-cyan-300"
+                    className="w-full px-5 py-3.5 text-left text-xs font-semibold text-[--text-primary] flex items-center justify-between gap-3 cursor-pointer hover:text-[--accent-blue] transition-colors"
                   >
                     <span>{faq.q}</span>
-                    {isOpen ? <ChevronUp className="w-4 h-4 text-cyan-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />}
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-[--accent-blue] shrink-0" /> : <ChevronDown className="w-4 h-4 text-[--text-muted] shrink-0" />}
                   </button>
                   <AnimatePresence>
                     {isOpen && (
@@ -220,7 +220,7 @@ export function UserGuideView({ onConnectClick, accounts, lang = 'id' }: Props) 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="px-5 pb-4 text-xs text-slate-400 leading-relaxed border-t border-slate-800/60 pt-3"
+                        className="px-5 pb-4 text-xs text-[--text-secondary] leading-relaxed border-t border-white/5 pt-3"
                       >
                         {faq.a}
                       </motion.div>

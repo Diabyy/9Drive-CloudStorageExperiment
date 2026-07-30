@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HardDrive, TrendingUp, Zap, RefreshCw, Unlink, Crown } from 'lucide-react';
+import { HardDrive, RefreshCw, Unlink, Crown } from 'lucide-react';
 import type { DriveAccount } from '../types';
 
 interface ConnectedAccountsViewProps {
@@ -9,42 +9,32 @@ interface ConnectedAccountsViewProps {
   onSync?: (id: string) => void;
 }
 
-const ACCOUNT_COLORS: Record<string, { gradient: string; glow: string; ring: string }> = {
-  cyan:    { gradient: 'from-cyan-500 to-blue-600',    glow: 'rgba(6,182,212,0.25)',   ring: 'ring-cyan-500/30' },
-  purple:  { gradient: 'from-indigo-500 to-purple-600', glow: 'rgba(99,102,241,0.25)', ring: 'ring-indigo-500/30' },
-  emerald: { gradient: 'from-emerald-400 to-teal-600', glow: 'rgba(16,185,129,0.25)',  ring: 'ring-emerald-500/30' },
-  rose:    { gradient: 'from-rose-500 to-pink-600',    glow: 'rgba(244,63,94,0.25)',   ring: 'ring-rose-500/30' },
-  amber:   { gradient: 'from-amber-400 to-orange-500', glow: 'rgba(245,158,11,0.25)',  ring: 'ring-amber-500/30' },
-};
-
 const container = {
   hidden: {},
   show: { transition: { staggerChildren: 0.07 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 16 },
   show:   { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 28 } },
 };
 
-function StorageRing({ usedPct, color }: { usedPct: number; color: string }) {
+const DRIVE_COLORS = ['#2997FF', '#BF5AF2', '#30D158', '#FF453A', '#FF9F0A'];
+
+function StorageRing({ usedPct, strokeColor }: { usedPct: number; strokeColor: string }) {
   const radius = 28;
   const circ = 2 * Math.PI * radius;
   const dash = (usedPct / 100) * circ;
-  const colorMap: Record<string, string> = {
-    cyan: '#06B6D4', purple: '#6366F1', emerald: '#10B981', rose: '#F43F5E', amber: '#F59E0B',
-  };
-  const stroke = colorMap[color] || '#06B6D4';
 
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" className="-rotate-90">
-      <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(51,65,85,0.5)" strokeWidth="5" />
+      <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
       <circle
         cx="36" cy="36" r={radius} fill="none"
-        stroke={stroke} strokeWidth="5"
+        stroke={strokeColor} strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={`${dash} ${circ}`}
-        style={{ filter: `drop-shadow(0 0 4px ${stroke}80)` }}
+        style={{ filter: `drop-shadow(0 0 4px ${strokeColor}60)` }}
       />
     </svg>
   );
@@ -53,13 +43,16 @@ function StorageRing({ usedPct, color }: { usedPct: number; color: string }) {
 export function ConnectedAccountsView({ accounts, onDisconnect, onSync }: ConnectedAccountsViewProps) {
   if (accounts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center">
-          <HardDrive className="w-7 h-7 text-slate-600" />
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-6">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <HardDrive className="w-7 h-7 text-[--text-muted]" strokeWidth={1.5} />
         </div>
         <div>
-          <p className="text-slate-300 font-semibold">No drives connected</p>
-          <p className="text-slate-600 text-sm mt-1">Add a Google Drive account to get started</p>
+          <p className="text-[--text-primary] font-semibold text-sm">Belum Ada Drive Terhubung</p>
+          <p className="text-[--text-secondary] text-xs mt-1">Tambahkan akun Google Drive untuk mulai menggunakan Vault</p>
         </div>
       </div>
     );
@@ -70,52 +63,55 @@ export function ConnectedAccountsView({ accounts, onDisconnect, onSync }: Connec
 
   return (
     <div className="h-full overflow-y-auto p-5 space-y-5">
-      {/* Aggregate Card */}
+      {/* Aggregate Storage Card */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-surface rounded-2xl p-5 border border-slate-700/50"
+        className="rounded-2xl p-6"
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(30px)',
+        }}
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="heading-kinetic text-xs text-slate-400 tracking-widest">TOTAL VAULT CAPACITY</p>
-            <p className="text-2xl font-extrabold glow-text mt-1">{totalGB.toFixed(1)} GB</p>
+            <p className="text-[11px] font-semibold text-[--text-muted] tracking-wider uppercase">KAPASITAS TOTAL VAULT</p>
+            <p className="text-3xl font-extrabold text-[--accent-blue] mt-1 tracking-tight">{totalGB.toFixed(1)} GB</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500">{usedGB.toFixed(2)} GB used</p>
-            <p className="text-xs text-emerald-400 font-semibold">{(totalGB - usedGB).toFixed(1)} GB free</p>
+            <p className="text-xs text-[--text-secondary]">{usedGB.toFixed(2)} GB terpakai</p>
+            <p className="text-xs text-[--accent-green] font-semibold">{(totalGB - usedGB).toFixed(1)} GB bebas</p>
           </div>
         </div>
 
-        {/* Segmented multi-account bar */}
-        <div className="h-2 rounded-full bg-slate-800/80 flex overflow-hidden gap-px">
+        {/* Multi-account Storage Bar */}
+        <div className="h-2 rounded-full bg-white/5 flex overflow-hidden gap-px">
           {accounts.map((acc, i) => {
             const pct = totalGB > 0 ? (acc.usedStorageGB / totalGB) * 100 : 0;
-            const colors = ['bg-cyan-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500'];
-            return <div key={acc.id} className={`${colors[i % colors.length]} h-full rounded-sm`} style={{ width: `${Math.max(pct, 0.5)}%` }} />;
+            const color = DRIVE_COLORS[i % DRIVE_COLORS.length];
+            return <div key={acc.id} className="h-full rounded-sm" style={{ width: `${Math.max(pct, 0.5)}%`, background: color }} />;
           })}
         </div>
 
-        <div className="flex flex-wrap gap-3 mt-3">
+        <div className="flex flex-wrap gap-4 mt-4">
           {accounts.map((acc, i) => {
-            const colors = ['text-cyan-400', 'text-indigo-400', 'text-emerald-400', 'text-rose-400', 'text-amber-400'];
-            const dots = ['bg-cyan-400', 'bg-indigo-400', 'bg-emerald-400', 'bg-rose-400', 'bg-amber-400'];
+            const color = DRIVE_COLORS[i % DRIVE_COLORS.length];
             return (
-              <div key={acc.id} className="flex items-center gap-1.5 text-[11px]">
-                <span className={`w-2 h-2 rounded-sm ${dots[i % dots.length]}`} />
-                <span className="text-slate-500 truncate max-w-[100px]">{acc.email.split('@')[0]}</span>
-                <span className={`${colors[i % colors.length]} font-semibold`}>{acc.usedStorageGB.toFixed(1)}GB</span>
+              <div key={acc.id} className="flex items-center gap-2 text-[11px]">
+                <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                <span className="text-[--text-secondary] truncate max-w-[120px]">{acc.email.split('@')[0]}</span>
+                <span className="font-semibold" style={{ color }}>{acc.usedStorageGB.toFixed(1)} GB</span>
               </div>
             );
           })}
         </div>
       </motion.div>
 
-      {/* Individual Account Cards */}
+      {/* Individual Drive Cards Grid */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {accounts.map((acc, idx) => {
-          const accent = acc.accentColor || 'cyan';
-          const theme = ACCOUNT_COLORS[accent] || ACCOUNT_COLORS.cyan;
+          const driveColor = DRIVE_COLORS[idx % DRIVE_COLORS.length];
           const usedPct = acc.totalStorageGB > 0 ? (acc.usedStorageGB / acc.totalStorageGB) * 100 : 0;
           const freeGB = acc.totalStorageGB - acc.usedStorageGB;
 
@@ -123,76 +119,114 @@ export function ConnectedAccountsView({ accounts, onDisconnect, onSync }: Connec
             <motion.div
               key={acc.id}
               variants={item}
-              whileHover={{ y: -4, borderColor: 'rgba(6,182,212,0.4)' }}
+              whileHover={{ y: -3 }}
               transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-              className="glass-surface rounded-2xl p-5 border border-slate-700/40 group cursor-default"
+              className="rounded-2xl p-5 cursor-default transition-all"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
             >
-              {/* Account Header */}
+              {/* Card Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-white font-bold text-sm shadow-lg`}
-                    style={{ boxShadow: `0 4px 14px ${theme.glow}` }}>
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                    style={{ background: driveColor }}
+                  >
                     {acc.email[0].toUpperCase()}
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold text-slate-100 truncate max-w-[120px]">{acc.name}</p>
-                      {acc.isPrimary && <Crown className="w-3 h-3 text-amber-400" />}
+                      <p className="text-sm font-semibold text-[--text-primary] truncate max-w-[140px]">{acc.name}</p>
+                      {acc.isPrimary && <Crown className="w-3.5 h-3.5 text-[--accent-orange]" />}
                     </div>
-                    <p className="text-[11px] text-slate-500 truncate max-w-[130px]">{acc.email}</p>
+                    <p className="text-[11px] text-[--text-muted] truncate max-w-[150px]">{acc.email}</p>
                   </div>
                 </div>
 
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border tracking-wider uppercase ${
-                  acc.status === 'connected' ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-slate-700/50 border-slate-600/50 text-slate-400'
-                }`}>
+                <span
+                  className="text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"
+                  style={{
+                    background: acc.status === 'connected' ? 'rgba(48, 209, 88, 0.10)' : 'rgba(255, 255, 255, 0.05)',
+                    color: acc.status === 'connected' ? 'var(--accent-green)' : 'var(--text-muted)',
+                    border: acc.status === 'connected' ? '1px solid rgba(48, 209, 88, 0.20)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                >
                   {acc.status}
                 </span>
               </div>
 
-              {/* Storage Ring + Stats */}
+              {/* Ring & Stats */}
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative shrink-0">
-                  <StorageRing usedPct={usedPct} color={accent} />
+                  <StorageRing usedPct={usedPct} strokeColor={driveColor} />
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-xs font-bold text-slate-100 leading-none">{usedPct.toFixed(0)}%</p>
-                    <p className="text-[9px] text-slate-500">used</p>
+                    <p className="text-xs font-bold text-[--text-primary] leading-none">{usedPct.toFixed(0)}%</p>
+                    <p className="text-[9px] text-[--text-muted] mt-0.5">terpakai</p>
                   </div>
                 </div>
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-2 text-xs">
                   <div>
-                    <div className="flex justify-between text-[11px] mb-1">
-                      <span className="text-slate-500">Used</span>
-                      <span className="text-slate-300 font-semibold">{acc.usedStorageGB.toFixed(2)} GB</span>
+                    <div className="flex justify-between text-[11px] mb-1 text-[--text-secondary]">
+                      <span>Terpakai</span>
+                      <span className="text-[--text-primary] font-semibold">{acc.usedStorageGB.toFixed(2)} GB</span>
                     </div>
                     <div className="progress-track h-1.5">
-                      <div className={`progress-fill h-full bg-gradient-to-r ${theme.gradient}`} style={{ width: `${usedPct}%` }} />
+                      <div className="progress-fill h-full" style={{ width: `${usedPct}%`, background: driveColor }} />
                     </div>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500">Free</span>
-                    <span className="text-emerald-400 font-semibold">{freeGB.toFixed(1)} GB</span>
+                    <span className="text-[--text-muted]">Sisa Bebas</span>
+                    <span className="font-semibold" style={{ color: 'var(--accent-green)' }}>{freeGB.toFixed(1)} GB</span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500">Total</span>
-                    <span className="text-slate-300 font-semibold">{acc.totalStorageGB.toFixed(1)} GB</span>
+                    <span className="text-[--text-muted]">Kapasitas Total</span>
+                    <span className="text-[--text-secondary] font-semibold">{acc.totalStorageGB.toFixed(1)} GB</span>
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-3 border-t border-slate-700/40">
+              {/* Card Actions */}
+              <div className="flex gap-2 pt-3" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
                 <button
                   onClick={() => onSync?.(acc.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 border border-slate-700/50 hover:border-cyan-500/30 transition-all duration-150 cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold transition-all cursor-pointer"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--accent-blue)';
+                    e.currentTarget.style.borderColor = 'rgba(41, 151, 255, 0.3)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  }}
                 >
-                  <RefreshCw className="w-3 h-3" /> Sync
+                  <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} /> Sync
                 </button>
+
                 <button
                   onClick={() => onDisconnect?.(acc.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-700/50 hover:border-rose-500/30 transition-all duration-150 cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold transition-all cursor-pointer"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--accent-red)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 69, 58, 0.3)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  }}
                 >
-                  <Unlink className="w-3 h-3" /> Disconnect
+                  <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} /> Putuskan
                 </button>
               </div>
             </motion.div>
