@@ -18,12 +18,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+
+  // OTP Verification States
+  const [isOtpView, setIsOtpView] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   if (!isOpen) return null;
 
   const handleBackToLanding = () => {
     window.location.href = '/';
+  };
+
+  const startCooldown = () => {
+    setResendCooldown(60);
+    const interval = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,18 +54,70 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
 
     setLoading(true);
     setErrorMsg('');
+    setSuccessMsg('');
 
     try {
       if (isLoginMode) {
         const res = await authApi.login(email, password);
-        onSuccess(res.user);
+        if (res.user) {
+          onSuccess(res.user);
+        }
       } else {
         const res = await authApi.register(email, password, fullName);
+        if (res.requiresVerification) {
+          setIsOtpView(true);
+          setSuccessMsg(res.message || (lang === 'id' ? 'Kode OTP telah dikirim' : 'OTP code sent'));
+          startCooldown();
+        } else if (res.user) {
+          onSuccess(res.user);
+        }
+      }
+    } catch (err: any) {
+      if (err?.response?.data?.requiresVerification) {
+        setIsOtpView(true);
+        setSuccessMsg(err.response.data.message || (lang === 'id' ? 'Masukkan kode OTP 6-digit' : 'Enter 6-digit OTP code'));
+        startCooldown();
+      } else {
+        const msg = err?.response?.data?.error || err.message || (lang === 'id' ? 'Gagal autentikasi' : 'Authentication failed');
+        setErrorMsg(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length < 6) {
+      setErrorMsg(lang === 'id' ? 'Masukkan 6 digit kode OTP' : 'Enter full 6-digit OTP code');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await authApi.verifyOtp(email, otpCode);
+      if (res.user) {
         onSuccess(res.user);
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || (lang === 'id' ? 'Gagal autentikasi' : 'Authentication failed');
+      const msg = err?.response?.data?.error || err.message || (lang === 'id' ? 'Kode OTP tidak valid' : 'Invalid OTP code');
       setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await authApi.resendOtp(email);
+      setSuccessMsg(res.message || (lang === 'id' ? 'Kode OTP baru telah dikirim' : 'New OTP code sent'));
+      startCooldown();
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.error || (lang === 'id' ? 'Gagal mengirim ulang OTP' : 'Failed to resend OTP'));
     } finally {
       setLoading(false);
     }
@@ -119,20 +190,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
           {/* Header Title */}
           <div className="text-center mb-6 relative z-10">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#2997FF]/10 border border-[#2997FF]/30 text-[--accent-blue] mb-3">
-              <ShieldCheck className="w-6 h-6" strokeWidth={1.5} />
+              {isOtpView ? <KeyRound className="w-6 h-6" strokeWidth={1.5} /> : <ShieldCheck className="w-6 h-6" strokeWidth={1.5} />}
             </div>
             
             <h2 className="text-2xl font-extrabold tracking-tight text-white flex items-center justify-center gap-2">
-              <span className="text-gradient-apple">9DRIVE VAULT</span>
+              <span className="text-gradient-apple">{isOtpView ? (lang === 'id' ? 'VERIFIKASI EMAIL' : 'VERIFY EMAIL') : '9DRIVE VAULT'}</span>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-[--accent-blue] font-mono border border-white/10">v1.0</span>
             </h2>
 
             <p className="text-xs text-[--text-secondary] mt-1.5 font-medium">
-              {isLoginMode
+              {isOtpView
+                ? (lang === 'id' ? `Kode OTP 6-digit dikirim ke: ${email}` : `6-digit OTP code sent to: ${email}`)
+                : isLoginMode
                 ? (lang === 'id' ? 'Masuk ke Vault Terpadu Anda' : 'Sign in to your Unified Vault')
                 : (lang === 'id' ? 'Buat Akun Vault Baru' : 'Create a New Vault Account')}
             </p>
           </div>
+
+          {/* Success Alert */}
+          {successMsg && (
+            <motion.div 
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded-xl text-center font-medium"
+            >
+              {successMsg}
+            </motion.div>
+          )}
 
           {/* Error Alert */}
           {errorMsg && (
@@ -144,6 +228,71 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
               {errorMsg}
             </motion.div>
           )}
+
+          {/* OTP Verification Form View */}
+          {isOtpView ? (
+            <form onSubmit={handleVerifyOtp} className="space-y-4 relative z-10">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-[--text-secondary] tracking-wide uppercase">
+                  {lang === 'id' ? 'Masukkan Kode OTP 6-Digit' : 'Enter 6-Digit OTP Code'}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  className="w-full text-center tracking-[0.5em] text-xl font-bold py-3.5 px-4 rounded-2xl text-white placeholder-[--text-muted] outline-none transition-all font-mono"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(41, 151, 255, 0.3)',
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || otpCode.length < 6}
+                className="btn-nike-bold w-full py-3.5 px-4 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xl disabled:opacity-50 mt-2"
+              >
+                {loading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>{lang === 'id' ? 'VERIFIKASI & MASUK VAULT' : 'VERIFY & SIGN IN'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading || resendCooldown > 0}
+                  className="text-xs text-[--accent-blue] hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline font-semibold"
+                >
+                  {resendCooldown > 0
+                    ? (lang === 'id' ? `Kirim Ulang Kode (${resendCooldown}s)` : `Resend Code (${resendCooldown}s)`)
+                    : (lang === 'id' ? 'Kirim Ulang Kode OTP' : 'Resend OTP Code')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOtpView(false);
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className="text-xs text-[--text-secondary] hover:text-white transition-colors cursor-pointer"
+                >
+                  {lang === 'id' ? '← Kembali ke Form' : '← Back to Form'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4 relative z-10">
 
           {/* Google One-Tap Magic SSO Button */}
           <div className="mb-5 relative z-10">
@@ -299,7 +448,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
               <KeyRound className="w-3.5 h-3.5 text-[--accent-blue]" />
               <span>{lang === 'id' ? 'Masuk Mode Demo (Instant Access)' : 'Quick Demo Access'}</span>
             </button>
-          </form>
+            </form>
+          </div>
+        )}
 
           {/* Toggle Mode & Terms Link */}
           <div className="mt-6 pt-4 border-t border-white/10 text-center relative z-10 space-y-3">

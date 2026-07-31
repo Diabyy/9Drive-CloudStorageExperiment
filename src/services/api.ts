@@ -49,6 +49,19 @@ export const authApi = {
     return res.data.url as string;
   },
 
+  async verifyOtp(email: string, otpCode: string) {
+    const res = await apiClient.post('/auth/verify-otp', { email, otpCode });
+    if (res.data.accessToken) {
+      localStorage.setItem('9drive_access_token', res.data.accessToken);
+    }
+    return res.data;
+  },
+
+  async resendOtp(email: string) {
+    const res = await apiClient.post('/auth/resend-otp', { email });
+    return res.data;
+  },
+
   async exchangeGoogleCode(code: string) {
     const res = await apiClient.post('/auth/google/exchange', { code });
     return res.data;

@@ -92,23 +92,120 @@ app.post('/api/v1/auth/register', asyncHandler(async (req, res) => {
 
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (existing) {
+    if (!existing.isEmailVerified) {
+      // Re-trigger OTP verification for existing unverified email
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { otpCode, otpExpiresAt },
+      });
+      console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${existing.email}: ${otpCode}\n`);
+      return res.json({
+        requiresVerification: true,
+        email: existing.email,
+        message: 'Email belum terverifikasi. Masukkan kode OTP 6-digit.',
+        demoOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+      });
+    }
     return res.status(400).json({ error: 'Email is already registered' });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
   const user = await prisma.user.create({
     data: {
       email: email.toLowerCase().trim(),
       passwordHash,
       fullName: fullName?.trim() || email.split('@')[0],
+      isEmailVerified: false,
+      otpCode,
+      otpExpiresAt,
     },
   });
 
-  const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${user.email}: ${otpCode}\n`);
+
+  res.json({
+    requiresVerification: true,
+    email: user.email,
+    message: 'Kode OTP 6-digit telah dikirim ke email Anda.',
+    demoOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+  });
+}));
+
+app.post('/api/v1/auth/verify-otp', asyncHandler(async (req, res) => {
+  const { email, otpCode } = req.body;
+  if (!email || !otpCode) {
+    return res.status(400).json({ error: 'Email and OTP code are required' });
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (user.isEmailVerified) {
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    return res.json({
+      success: true,
+      accessToken,
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+    });
+  }
+
+  if (!user.otpCode || user.otpCode !== otpCode.trim()) {
+    return res.status(400).json({ error: 'Kode OTP tidak valid' });
+  }
+
+  if (user.otpExpiresAt && user.otpExpiresAt < new Date()) {
+    return res.status(400).json({ error: 'Kode OTP telah kadaluarsa. Silakan minta kode baru.' });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isEmailVerified: true,
+      otpCode: null,
+      otpExpiresAt: null,
+    },
+  });
+
+  const accessToken = jwt.sign({ id: updatedUser.id, email: updatedUser.email }, JWT_SECRET, { expiresIn: '7d' });
   res.json({
     success: true,
     accessToken,
-    user: { id: user.id, email: user.email, fullName: user.fullName },
+    user: { id: updatedUser.id, email: updatedUser.email, fullName: updatedUser.fullName },
+  });
+}));
+
+app.post('/api/v1/auth/resend-otp', asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (user.isEmailVerified) {
+    return res.status(400).json({ error: 'Email sudah terverifikasi' });
+  }
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { otpCode, otpExpiresAt },
+  });
+
+  console.log(`\n[9DRIVE OTP RESEND] 📩 New code for ${user.email}: ${otpCode}\n`);
+
+  res.json({
+    success: true,
+    message: 'Kode OTP baru telah dikirim.',
+    demoOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
   });
 }));
 
@@ -126,6 +223,23 @@ app.post('/api/v1/auth/login', asyncHandler(async (req, res) => {
   const isValid = await bcrypt.compare(password, user.passwordHash);
   if (!isValid) {
     return res.status(401).json({ error: 'Invalid email or password' });
+  }
+
+  if (!user.isEmailVerified) {
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { otpCode, otpExpiresAt },
+    });
+    console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${user.email}: ${otpCode}\n`);
+
+    return res.status(403).json({
+      requiresVerification: true,
+      email: user.email,
+      message: 'Email Anda belum terverifikasi. Masukkan kode OTP 6-digit.',
+      demoOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+    });
   }
 
   const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
@@ -197,10 +311,14 @@ app.post('/api/v1/auth/google/exchange', asyncHandler(async (req: AuthRequest, r
   if (!userId) {
     user = await prisma.user.upsert({
       where: { email: result.email.toLowerCase().trim() },
-      update: { fullName: result.name || result.email.split('@')[0] },
+      update: {
+        fullName: result.name || result.email.split('@')[0],
+        isEmailVerified: true,
+      },
       create: {
         email: result.email.toLowerCase().trim(),
         fullName: result.name || result.email.split('@')[0],
+        isEmailVerified: true,
       },
     });
     userId = user.id;
