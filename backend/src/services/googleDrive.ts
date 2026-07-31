@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'node:stream';
 import { decryptToken } from './crypto.js';
 
@@ -78,7 +78,7 @@ export async function streamUploadToDrive(params: {
 }) {
   const drive = await getAuthenticatedDriveClient(params.encryptedRefreshToken);
 
-  const fileMetadata: any = {
+  const fileMetadata: drive_v3.Schema$File = {
     name: params.fileName,
   };
 

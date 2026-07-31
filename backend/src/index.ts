@@ -271,8 +271,9 @@ app.get('/api/v1/auth/google/url', (_req, res) => {
   try {
     const url = generateAuthUrl();
     res.json({ url });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to generate Google OAuth URL' });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to generate Google OAuth URL';
+    res.status(500).json({ error: msg });
   }
 });
 

@@ -53,8 +53,9 @@ export function useVaultData(lang: 'id' | 'en' = 'id') {
           refreshVaultContent(currentFolderId);
           showToast(lang === 'id' ? `Berhasil Login & Hubungkan Google Drive: ${res.email}` : `Connected Google Drive: ${res.email}`, 'success');
         })
-        .catch((err: any) => {
-          showToast(`OAuth Error: ${err.response?.data?.error || err.message}`, 'error');
+        .catch((err: unknown) => {
+          const axiosErr = err as { response?: { data?: { error?: string } }; message?: string };
+          showToast(`OAuth Error: ${axiosErr.response?.data?.error || axiosErr.message || 'Authentication failed'}`, 'error');
         });
     }
   }, [currentFolderId, lang, refreshVaultContent, showToast]);

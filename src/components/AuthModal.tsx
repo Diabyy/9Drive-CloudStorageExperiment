@@ -72,13 +72,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
           onSuccess(res.user);
         }
       }
-    } catch (err: any) {
-      if (err?.response?.data?.requiresVerification) {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { requiresVerification?: boolean; message?: string; error?: string } }; message?: string };
+      if (axiosErr?.response?.data?.requiresVerification) {
         setIsOtpView(true);
-        setSuccessMsg(err.response.data.message || (lang === 'id' ? 'Masukkan kode OTP 6-digit' : 'Enter 6-digit OTP code'));
+        setSuccessMsg(axiosErr.response.data.message || (lang === 'id' ? 'Masukkan kode OTP 6-digit' : 'Enter 6-digit OTP code'));
         startCooldown();
       } else {
-        const msg = err?.response?.data?.error || err.message || (lang === 'id' ? 'Gagal autentikasi' : 'Authentication failed');
+        const msg = axiosErr?.response?.data?.error || axiosErr?.message || (lang === 'id' ? 'Gagal autentikasi' : 'Authentication failed');
         setErrorMsg(msg);
       }
     } finally {
@@ -100,8 +101,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
       if (res.user) {
         onSuccess(res.user);
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || (lang === 'id' ? 'Kode OTP tidak valid' : 'Invalid OTP code');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string };
+      const msg = axiosErr?.response?.data?.error || axiosErr?.message || (lang === 'id' ? 'Kode OTP tidak valid' : 'Invalid OTP code');
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -116,8 +118,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onSuccess, lang = 
       const res = await authApi.resendOtp(email);
       setSuccessMsg(res.message || (lang === 'id' ? 'Kode OTP baru telah dikirim' : 'New OTP code sent'));
       startCooldown();
-    } catch (err: any) {
-      setErrorMsg(err?.response?.data?.error || (lang === 'id' ? 'Gagal mengirim ulang OTP' : 'Failed to resend OTP'));
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setErrorMsg(axiosErr?.response?.data?.error || (lang === 'id' ? 'Gagal mengirim ulang OTP' : 'Failed to resend OTP'));
     } finally {
       setLoading(false);
     }
