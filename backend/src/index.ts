@@ -13,6 +13,7 @@ import { generateAuthUrl, exchangeCodeForTokens, streamUploadToDrive, getAuthent
 import { encryptToken } from './services/crypto.js';
 import { backupDatabaseToDrive } from './services/dbBackup.js';
 import { asyncHandler } from './utils/asyncHandler.js';
+import { sendOtpEmail } from './services/emailService.js';
 
 // Polyfill BigInt.prototype.toJSON to prevent Express res.json() crash on Prisma BigInt fields
 (BigInt.prototype as any).toJSON = function () {
@@ -101,6 +102,7 @@ app.post('/api/v1/auth/register', asyncHandler(async (req, res) => {
         data: { otpCode, otpExpiresAt },
       });
       console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${existing.email}: ${otpCode}\n`);
+      sendOtpEmail(existing.email, otpCode);
       return res.json({
         requiresVerification: true,
         email: existing.email,
@@ -127,6 +129,7 @@ app.post('/api/v1/auth/register', asyncHandler(async (req, res) => {
   });
 
   console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${user.email}: ${otpCode}\n`);
+  sendOtpEmail(user.email, otpCode);
 
   res.json({
     requiresVerification: true,
@@ -201,6 +204,7 @@ app.post('/api/v1/auth/resend-otp', asyncHandler(async (req, res) => {
   });
 
   console.log(`\n[9DRIVE OTP RESEND] 📩 New code for ${user.email}: ${otpCode}\n`);
+  sendOtpEmail(user.email, otpCode);
 
   res.json({
     success: true,
@@ -233,6 +237,7 @@ app.post('/api/v1/auth/login', asyncHandler(async (req, res) => {
       data: { otpCode, otpExpiresAt },
     });
     console.log(`\n[9DRIVE OTP VERIFICATION] 📩 Code for ${user.email}: ${otpCode}\n`);
+    sendOtpEmail(user.email, otpCode);
 
     return res.status(403).json({
       requiresVerification: true,
