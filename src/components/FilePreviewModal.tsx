@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Eye, Download, HardDrive, MoveRight, Trash2, Check, Copy, FileText,
+  X, Eye, Download, HardDrive, MoveRight, Trash2, Check, Copy, FileText, Image as ImageIcon, Film, Music, FileCode,
 } from 'lucide-react';
 import { VaultFile, DriveAccount } from '../types';
+import { filesApi } from '../services/api';
 
 interface FilePreviewModalProps {
   file: VaultFile | null;
@@ -27,6 +28,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   if (!file) return null;
 
   const drive = accounts.find((a) => a.id === file.driveId);
+  const previewUrl = filesApi.getPreviewUrl(file.id);
+  const downloadUrl = filesApi.getDownloadUrl(file.id);
 
   const handleCopyLink = () => {
     const link = file.sharedUrl || `https://vault.9drive.io/s/${file.id}`;
@@ -34,6 +37,12 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const isImage = file.category === 'images' || file.mimeType.startsWith('image/');
+  const isVideo = file.category === 'videos' || file.mimeType.startsWith('video/');
+  const isAudio = file.mimeType.startsWith('audio/');
+  const isPdf = file.mimeType.includes('pdf');
+  const isCodeOrText = file.category === 'code' || file.mimeType.startsWith('text/');
 
   return (
     <AnimatePresence>
@@ -88,37 +97,46 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
           {/* Media Preview Stage */}
           <div
-            className="mb-6 rounded-2xl p-4 min-h-[200px] max-h-[320px] overflow-hidden flex items-center justify-center relative"
+            className="mb-6 rounded-2xl p-4 min-h-[220px] max-h-[340px] overflow-hidden flex items-center justify-center relative"
             style={{
               background: 'rgba(0, 0, 0, 0.4)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
-            {file.category === 'videos' ? (
+            {isImage ? (
+              <img
+                src={previewUrl}
+                alt={file.name}
+                className="max-h-72 object-contain rounded-xl shadow-2xl"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : isVideo ? (
               <video
                 controls
-                src={file.sharedUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
-                className="max-h-64 w-full rounded-xl object-contain shadow-2xl"
+                src={previewUrl}
+                className="max-h-72 w-full rounded-xl object-contain shadow-2xl"
               />
-            ) : file.mimeType.startsWith('audio/') ? (
+            ) : isAudio ? (
               <div className="w-full p-6 text-center space-y-4">
                 <div className="w-16 h-16 rounded-full bg-[--accent-purple]/20 border border-[--accent-purple]/40 text-[--accent-purple] mx-auto flex items-center justify-center animate-bounce">
-                  <FileText className="w-8 h-8" />
+                  <Music className="w-8 h-8" />
                 </div>
-                <audio controls className="w-full">
-                  <source src={file.sharedUrl} />
-                </audio>
+                <audio controls className="w-full" src={previewUrl} />
               </div>
-            ) : file.thumbnailUrl ? (
-              <img
-                src={file.thumbnailUrl}
-                alt={file.name}
-                className="max-h-60 object-contain rounded-xl shadow-2xl"
+            ) : isPdf ? (
+              <iframe
+                src={previewUrl}
+                title={file.name}
+                className="w-full h-72 rounded-xl border-none shadow-2xl bg-white"
               />
-            ) : file.category === 'code' ? (
-              <pre className="w-full text-[11px] text-[--accent-blue] font-mono p-4 rounded-xl overflow-x-auto whitespace-pre-wrap leading-relaxed bg-white/[0.02]">
-                {file.contentPreview || '// Encryption Block Header v4'}
-              </pre>
+            ) : isCodeOrText ? (
+              <iframe
+                src={previewUrl}
+                title={file.name}
+                className="w-full h-72 rounded-xl border-none shadow-2xl bg-slate-950 p-2"
+              />
             ) : (
               <div className="text-center space-y-3 p-6">
                 <FileText className="w-12 h-12 text-[--accent-blue] mx-auto animate-pulse" strokeWidth={1.5} />
@@ -214,7 +232,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               </button>
 
               <a
-                href={`http://localhost:4000/api/v1/files/${file.id}/download`}
+                href={downloadUrl}
                 download={file.name}
                 target="_blank"
                 rel="noreferrer"

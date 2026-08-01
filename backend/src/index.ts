@@ -34,9 +34,15 @@ export interface AuthRequest extends express.Request {
 }
 
 const authenticateJwt = (req: AuthRequest, res: express.Response, next: express.NextFunction) => {
+  let token: string | undefined;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token && typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
+
+  if (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
       req.user = decoded;
@@ -714,7 +720,10 @@ app.get('/api/v1/files/:id/download', authenticateJwt, async (req: AuthRequest, 
       { responseType: 'stream' }
     );
 
-    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    const isInline = req.query.inline === 'true';
+    const disposition = isInline ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(file.fileName)}"`);
     res.setHeader('Content-Type', file.mimeType);
     (driveRes.data as any).pipe(res);
   } catch (error: any) {

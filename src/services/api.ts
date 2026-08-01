@@ -141,7 +141,13 @@ export const filesApi = {
   },
 
   getDownloadUrl(fileId: string) {
-    return `${API_BASE_URL}/files/${fileId}/download`;
+    const token = localStorage.getItem('9drive_access_token') || '';
+    return `${API_BASE_URL}/files/${fileId}/download?token=${encodeURIComponent(token)}`;
+  },
+
+  getPreviewUrl(fileId: string) {
+    const token = localStorage.getItem('9drive_access_token') || '';
+    return `${API_BASE_URL}/files/${fileId}/download?token=${encodeURIComponent(token)}&inline=true`;
   },
 };
 
