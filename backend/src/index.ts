@@ -568,12 +568,74 @@ app.get('/api/v1/files', authenticateJwt, async (req: AuthRequest, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.delete('/api/v1/files/:id', authenticateJwt, async (req: AuthRequest, res) => {
   try {
-    await prisma.virtualFile.deleteMany({
+    const file = await prisma.virtualFile.findFirst({
       where: { id: req.params.id, userId: req.user!.id },
     });
+    if (file) {
+      await prisma.connectedAccount.update({
+        where: { id: file.connectedAccountId },
+        data: { usedQuotaBytes: { decrement: file.sizeBytes } },
+      }).catch(() => {});
+      await prisma.virtualFile.delete({ where: { id: file.id } });
+    }
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to delete file' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/v1/files/:id — Transfer/Migrate file to another Google Drive account
+// ─────────────────────────────────────────────────────────────────────────────
+app.patch('/api/v1/files/:id', authenticateJwt, async (req: AuthRequest, res) => {
+  try {
+    const { connectedAccountId } = req.body;
+    if (!connectedAccountId) {
+      return res.status(400).json({ error: 'Target connectedAccountId is required' });
+    }
+
+    const file = await prisma.virtualFile.findFirst({
+      where: { id: req.params.id, userId: req.user!.id },
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (file.connectedAccountId === connectedAccountId) {
+      return res.json({ success: true, file });
+    }
+
+    const targetAccount = await prisma.connectedAccount.findFirst({
+      where: { id: connectedAccountId, userId: req.user!.id },
+    });
+
+    if (!targetAccount) {
+      return res.status(404).json({ error: 'Target Drive account not found' });
+    }
+
+    // Adjust quota tracking for source and target connected accounts
+    await prisma.connectedAccount.update({
+      where: { id: file.connectedAccountId },
+      data: { usedQuotaBytes: { decrement: file.sizeBytes } },
+    }).catch(() => {});
+
+    await prisma.connectedAccount.update({
+      where: { id: targetAccount.id },
+      data: { usedQuotaBytes: { increment: file.sizeBytes } },
+    }).catch(() => {});
+
+    // Update VirtualFile connectedAccountId
+    const updatedFile = await prisma.virtualFile.update({
+      where: { id: file.id },
+      data: { connectedAccountId: targetAccount.id },
+      include: { connectedAccount: true },
+    });
+
+    res.json({ success: true, file: updatedFile });
+  } catch (error: any) {
+    console.error('PATCH /files/:id error:', error);
+    res.status(500).json({ error: error.message || 'Failed to migrate file' });
   }
 });
 

@@ -122,6 +122,16 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
     const file = files.find(f => f.id === fileId);
     const dest = accounts.find(a => a.id === targetDriveId);
     if (!file || !dest || file.driveId === targetDriveId) return;
+
+    filesApi.transferFile(fileId, targetDriveId)
+      .then(() => {
+        showToast(lang === 'id' ? `Berkas "${file.name}" berhasil dimigrasikan ke ${dest.name}` : `Migrated "${file.name}" to ${dest.name}`, 'success');
+      })
+      .catch((err) => {
+        const msg = err?.response?.data?.error || err?.message || 'Gagal migrasi berkas';
+        showToast(`Migrasi Gagal: ${msg}`, 'error');
+      });
+
     const gb = Number((file.sizeBytes / 1e9).toFixed(3)) || 0.01;
     setAccounts(accs => accs.map(a => {
       if (a.id === file.driveId) return { ...a, usedStorageGB: Math.max(0, a.usedStorageGB - gb) };
@@ -129,7 +139,7 @@ function Dashboard({ lang, toggleLang }: { lang: Language; toggleLang: () => voi
       return a;
     }));
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, driveId: dest.id, driveName: dest.name } : f));
-  }, [files, accounts]);
+  }, [files, accounts, lang, showToast]);
 
   const handleShareFile = useCallback((file: VaultFile) => {
     const url = file.sharedUrl || `https://vault.9drive.io/s/${file.id}`;
